@@ -126,6 +126,7 @@ def demo_charge(payload: dict | None = Body(None), db: Session = Depends(get_ses
         .where(
             Document.merchant_id == merchant.id,
             Document.transaction_ref.like("DEMO-%"),
+            Document.fiscal_status == FiscalStatus.REGISTERED,  # failures don't eat the cap
             Document.created_at >= hour_ago,
         )
     ).scalar_one()

@@ -24,7 +24,9 @@ const STEPS = [
 export default function LiveDemo() {
   const [phase, setPhase] = useState("idle"); // idle | running | done
   const [lit, setLit] = useState(-1);
-  const [live, setLive] = useState(null); // real just-registered doc, or null = replay
+  const [live, setLive] = useState(null); // real just-registered doc, or null
+  const [preview, setPreview] = useState(null); // cart-built preview when live path unavailable
+  const [showGenuine, setShowGenuine] = useState(false);
   const [qty, setQty] = useState({ FACIAL: 1, SERUM: 1, SUNSCREEN: 0 });
 
   const bump = (code, d) =>
@@ -35,10 +37,13 @@ export default function LiveDemo() {
 
   const run = async () => {
     if (phase === "running" || !cart.length) return;
-    setPhase("running"); setLit(-1); setLive(null);
+    setPhase("running"); setLit(-1); setLive(null); setPreview(null); setShowGenuine(false);
     STEPS.forEach((_, i) => setTimeout(() => setLit(i), 500 + i * 700));
-    // fire a REAL sandbox registration; fall back to the stored replay if the
-    // backend is unreachable (e.g. https page calling the http sandbox host)
+    // snapshot the cart NOW (state is immutable per render — no stale reads)
+    const snapItems = cart.map((c) => ({ name: c.name, qty: qty[c.code], unit: c.unit, total: c.unit * qty[c.code] }));
+    const snapTotal = snapItems.reduce((s, i) => s + i.total, 0);
+    // fire a REAL sandbox registration; if this page can't reach the pilot
+    // server (e.g. the https mirror), print an honest cart PREVIEW instead
     const charge = fetch(`${API_BASE}/demo/charge`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -48,11 +53,19 @@ export default function LiveDemo() {
       .then((d) => (d && d.ok ? d : null))
       .catch(() => null);
     const [result] = await Promise.all([charge, delay(600 + STEPS.length * 700)]);
-    setLive(result);
+    if (result) {
+      setLive(result);
+    } else {
+      setPreview({
+        docNo: "PREVIEW", date: "", items: snapItems,
+        total: snapTotal, preTax: snapTotal / 1.15, vat: snapTotal - snapTotal / 1.15,
+        irn: null, rrn: null, qr: null, isPreview: true,
+      });
+    }
     setPhase("done");
   };
 
-  const R = live || RECEIPT;
+  const R = live || (showGenuine || !preview ? RECEIPT : preview);
 
   const row = { display: "flex", justifyContent: "space-between" };
 
@@ -127,16 +140,42 @@ export default function LiveDemo() {
                   <div style={{ ...row, color: "var(--paper-muted)", fontSize: 12.5 }}><span>VAT 15%</span><span>{R.vat.toFixed(2)}</span></div>
                   <div style={{ ...row, fontWeight: 700, fontSize: 15.5, marginTop: 4 }}><span>TOTAL</span><span>ETB {R.total.toFixed(2)}</span></div>
                   <div className="dash-rule" />
-                  <img src={`data:image/png;base64,${R.qr}`} alt="Real MoR QR" style={{ width: 140, height: 140, display: "block", margin: "6px auto" }} />
-                  <div style={{ textAlign: "center", color: "var(--green)", fontWeight: 600, fontSize: 12, letterSpacing: ".08em" }}>
-                    ✓ REGISTERED WITH MINISTRY OF REVENUE{live ? " — JUST NOW" : ""}
-                  </div>
-                  <div style={{ textAlign: "center", color: "var(--paper-muted)", fontSize: 10, marginTop: 4 }}>
-                    {live
-                      ? "This receipt was created seconds ago — refresh the MoR portal and it's there."
-                      : "Registered 6 Jul 2026 in the MoR sandbox by this platform."}
-                  </div>
-                  <div style={{ fontSize: 8.5, color: "var(--paper-muted)", wordBreak: "break-all", textAlign: "center", marginTop: 6 }}>IRN {R.irn}</div>
+                  {R.qr ? (
+                    <img src={`data:image/png;base64,${R.qr}`} alt="Real MoR QR" style={{ width: 140, height: 140, display: "block", margin: "6px auto" }} />
+                  ) : (
+                    <div style={{ width: 140, height: 140, margin: "6px auto", border: "1.5px dashed #b9b5a6", display: "grid", placeItems: "center", textAlign: "center", color: "var(--paper-muted)", fontSize: 9.5, padding: 10 }}>
+                      MoR QR appears here when the sale is registered
+                    </div>
+                  )}
+                  {R.isPreview ? (
+                    <>
+                      <div style={{ textAlign: "center", color: "#a8750d", fontWeight: 700, fontSize: 12, letterSpacing: ".08em" }}>
+                        ⚠ PREVIEW — NOT REGISTERED
+                      </div>
+                      <div style={{ textAlign: "center", color: "var(--paper-muted)", fontSize: 10, marginTop: 4 }}>
+                        This secure page can't reach the pilot server, so nothing was sent to MoR.
+                        Live registrations run on the pilot deployment.
+                      </div>
+                      <div style={{ textAlign: "center", marginTop: 8 }}>
+                        <a href="#demo" onClick={(e) => { e.preventDefault(); setShowGenuine(true); }}
+                           style={{ color: "#0e7a4e", fontSize: 10.5, textDecoration: "underline" }}>
+                          See a genuine registered receipt instead →
+                        </a>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ textAlign: "center", color: "var(--green)", fontWeight: 600, fontSize: 12, letterSpacing: ".08em" }}>
+                        ✓ REGISTERED WITH MINISTRY OF REVENUE{live ? " — JUST NOW" : ""}
+                      </div>
+                      <div style={{ textAlign: "center", color: "var(--paper-muted)", fontSize: 10, marginTop: 4 }}>
+                        {live
+                          ? "This receipt was created seconds ago — refresh the MoR portal and it's there."
+                          : "Registered 6 Jul 2026 in the MoR sandbox by this platform."}
+                      </div>
+                    </>
+                  )}
+                  {R.irn && <div style={{ fontSize: 8.5, color: "var(--paper-muted)", wordBreak: "break-all", textAlign: "center", marginTop: 6 }}>IRN {R.irn}</div>}
                   {R.rrn && <div style={{ fontSize: 8.5, color: "var(--paper-muted)", wordBreak: "break-all", textAlign: "center" }}>RRN {R.rrn}</div>}
                 </motion.div>
               ) : (
