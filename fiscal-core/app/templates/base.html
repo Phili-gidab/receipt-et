@@ -4,6 +4,16 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <meta name="theme-color" content="#10b981"/>
+  <script>
+    /* theme boot: ?theme= → saved choice (shared with the landing) → system */
+    (function () {
+      var q = new URLSearchParams(location.search).get("theme");
+      var t = q || localStorage.getItem("theme")
+            || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      document.documentElement.setAttribute("data-theme", t);
+      if (q) localStorage.setItem("theme", q);
+    })();
+  </script>
   <title>{% block title %}Receipt{% endblock %} · Receipt POS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@800;900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -13,6 +23,12 @@
       --accent:#10b981; --accent-2:#34d399; --amber:#f0b429; --line:#2a332c;
       --paper:#f7f5ee; --paper-ink:#1a201b; --paper-muted:#5b635c;
       --red:#f0656f;
+    }
+    [data-theme="light"]{
+      --bg:#f2efe9; --bg-2:#faf8f2; --ink:#171d18; --muted:#68716a;
+      --accent:#0e9f6e; --accent-2:#0b8a5f; --amber:#a8750d; --line:#d8d3c4;
+      --paper:#fbf9f4; --paper-ink:#1a201b; --paper-muted:#5b635c;
+      --red:#c4353f;
     }
     *{margin:0;padding:0;box-sizing:border-box}
     body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:15px;line-height:1.6}
@@ -31,6 +47,8 @@
     .nav{display:flex;gap:6px;margin-left:auto;align-items:center}
     .nav a{text-decoration:none;font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);padding:8px 12px;border:1px dashed transparent}
     .nav a:hover,.nav a.active{color:var(--accent);border-color:var(--line)}
+    .theme-btn{font:inherit;font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);padding:8px 12px;border:1px dashed transparent;background:none;cursor:pointer}
+    .theme-btn:hover{color:var(--accent);border-color:var(--line)}
     /* buttons */
     .btn{display:inline-block;font-family:inherit;font-size:13px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;text-decoration:none;padding:12px 22px;cursor:pointer;border:2px solid var(--accent);background:transparent;color:var(--ink)}
     .btn-solid{background:var(--accent);color:#04130c;box-shadow:4px 4px 0 color-mix(in srgb,var(--accent) 32%,transparent)}
@@ -70,15 +88,28 @@
       <a class="brand" href="{% if m %}/app{% else %}/app/login{% endif %}">
         <span class="mark">🧾</span><span class="name">Receipt</span>
       </a>
-      {% if m %}
       <nav class="nav">
+        {% if m %}
         <a href="/app" class="{% block nav_home %}{% endblock %}">Dashboard</a>
         <a href="/app/pos" class="{% block nav_pos %}{% endblock %}">Sell</a>
         <a href="/app/receipts" class="{% block nav_receipts %}{% endblock %}">Receipts</a>
         <a href="/app/settings" class="{% block nav_settings %}{% endblock %}">Settings</a>
-        <a href="/app/logout">Logout</a>
+        {% endif %}
+        <button id="themeBtn" type="button" class="theme-btn" onclick="__toggleTheme()">◐ DARK</button>
+        {% if m %}<a href="/app/logout">Logout</a>{% endif %}
       </nav>
-      {% endif %}
+      <script>
+        function __syncThemeBtn(){
+          var b=document.getElementById("themeBtn");
+          if(b) b.textContent = document.documentElement.getAttribute("data-theme")==="dark" ? "◐ DARK" : "◑ LIGHT";
+        }
+        function __toggleTheme(){
+          var d=document.documentElement;
+          var n=d.getAttribute("data-theme")==="dark"?"light":"dark";
+          d.setAttribute("data-theme",n); localStorage.setItem("theme",n); __syncThemeBtn();
+        }
+        __syncThemeBtn();
+      </script>
     </div>
   </header>
   <main><div class="container">{% block content %}{% endblock %}</div></main>
