@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Verify{% endblock %}
+{% block content %}
+<div style="max-width:400px;margin:8vh auto 0">
+  <div style="text-align:center;margin-bottom:24px">
+    <div style="font-size:34px">🧾</div>
+    <h1 style="font-size:22px;margin-top:6px">Enter your code</h1>
+    <p class="muted" style="font-size:13px">Sent to {{ phone }}</p>
+  </div>
+  <div class="card">
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+    <form method="post" action="/app/verify">
+      <div class="field">
+        <label>6-digit code</label>
+        <input name="code" inputmode="numeric" maxlength="6" placeholder="000000" autofocus required
+               style="letter-spacing:8px;text-align:center;font-size:20px"/>
+      </div>
+      <button class="btn btn-solid btn-block" type="submit">Verify &amp; continue</button>
+    </form>
+    {% if dev_code %}
+    <p class="muted" style="font-size:11px;margin-top:14px;border-top:1px dashed var(--line);padding-top:12px">
+      DEV MODE — SMS gateway not wired yet. Use code <span class="accent">{{ dev_code }}</span>.
+    </p>
+    {% endif %}
+  </div>
+  <p class="muted" style="text-align:center;font-size:12px;margin-top:16px"><a href="/app/login">← Use a different number</a></p>
+</div>
+{% endblock %}

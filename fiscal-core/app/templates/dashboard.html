@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block nav_home %}active{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:8px">
+  <div>
+    <p class="kicker">Dashboard</p>
+    <h1 style="font-size:28px">{{ m.legal_name }}</h1>
+    <p class="muted" style="font-size:13px">TIN {{ m.tin }} · {{ m.system_type or 'POS' }} · {{ m.tax_code or 'VAT15' }}</p>
+  </div>
+  <a class="btn btn-solid" style="margin-left:auto" href="/app/pos">+ New Sale</a>
+</div>
+
+<hr class="dash"/>
+
+<div class="card" style="max-width:560px">
+  <p class="kicker">Today</p>
+  <div class="lead-row"><span>Sales registered</span><span class="fill"></span><span class="val">{{ stat_registered }}</span></div>
+  <div class="lead-row"><span>Documents issued</span><span class="fill"></span><span class="val">{{ stat_count }}</span></div>
+  <div class="lead-row" style="border-top:2px solid var(--line);margin-top:8px;padding-top:12px;font-size:16px">
+    <span>Total collected</span><span class="fill"></span><span class="val">ETB {{ '%.2f'|format(stat_total) }}</span>
+  </div>
+</div>
+
+<hr class="dash"/>
+
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px">
+  <h3 style="font-size:15px">Recent receipts</h3>
+  <a class="muted" style="margin-left:auto;font-size:12px" href="/app/receipts">View all →</a>
+</div>
+{% if recent %}
+<table>
+  <thead><tr><th>Ref</th><th>Type</th><th>Amount</th><th>Status</th><th>IRN / RRN</th><th></th></tr></thead>
+  <tbody>
+  {% for d in recent %}
+    <tr>
+      <td>{{ d.transaction_ref }}</td>
+      <td>{{ d.doc_type }}</td>
+      <td>ETB {{ '%.2f'|format(d.amount or 0) }}</td>
+      <td>
+        {% if d.fiscal_status.value == 'Registered' %}<span class="pill ok">Registered</span>
+        {% elif d.fiscal_status.value == 'Failed' %}<span class="pill bad">Failed</span>
+        {% else %}<span class="pill warn">{{ d.fiscal_status.value }}</span>{% endif %}
+      </td>
+      <td class="muted" style="font-size:11px;word-break:break-all">{{ (d.irn or d.rrn or '—')[:24] }}</td>
+      <td><a class="muted" href="/app/receipt/{{ d.id }}">open →</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No sales yet. <a class="accent" href="/app/pos">Ring up your first sale →</a></p>
+{% endif %}
+{% endblock %}

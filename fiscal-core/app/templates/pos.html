@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Sell{% endblock %}
+{% block nav_pos %}active{% endblock %}
+{% block content %}
+<p class="kicker">Point of sale</p>
+<h1 style="font-size:26px;margin-bottom:18px">New sale</h1>
+{% if error %}<div class="err">{{ error }}</div>{% endif %}
+
+<div style="display:grid;grid-template-columns:1.1fr .9fr;gap:26px" id="posGrid">
+  <!-- item entry -->
+  <div class="card">
+    <p class="kicker">Add item</p>
+    <div class="field"><label>Item name</label><input id="iName" placeholder="e.g. Macchiato"/></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="field"><label>Unit price (ETB)</label><input id="iPrice" inputmode="decimal" placeholder="0.00"/></div>
+      <div class="field"><label>Qty</label><input id="iQty" inputmode="numeric" value="1"/></div>
+    </div>
+    <button class="btn btn-ghost btn-block" type="button" onclick="addItem()">+ Add to cart</button>
+
+    <hr class="dash"/>
+    <p class="kicker">Buyer (optional — TIN makes it B2B)</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="field"><label>Buyer name</label><input id="bName" placeholder="Walk-in customer"/></div>
+      <div class="field"><label>Buyer TIN</label><input id="bTin" inputmode="numeric" placeholder="10-digit TIN"/></div>
+    </div>
+    <div class="field"><label>Payment</label>
+      <select id="pay">
+        <option value="CASH">Cash</option>
+        <option value="TELEBIRR">telebirr / mobile money</option>
+        <option value="CARD">Card</option>
+        <option value="CREDIT">Credit</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- cart / totals -->
+  <div class="card" style="display:flex;flex-direction:column">
+    <p class="kicker">Cart</p>
+    <div id="cartRows" style="flex:1;min-height:120px"></div>
+    <div style="border-top:2px dashed var(--line);padding-top:12px;margin-top:12px">
+      <div class="lead-row"><span>Subtotal</span><span class="fill"></span><span class="val" id="tSub">0.00</span></div>
+      <div class="lead-row"><span>VAT 15% (incl.)</span><span class="fill"></span><span class="val" id="tVat">0.00</span></div>
+      <div class="lead-row" style="font-size:17px;font-weight:700;border-top:2px solid var(--line);margin-top:6px;padding-top:10px">
+        <span>Total</span><span class="fill"></span><span class="val" id="tTot">ETB 0.00</span>
+      </div>
+    </div>
+    <form method="post" action="/app/pos/checkout" id="coForm" style="margin-top:14px">
+      <input type="hidden" name="cart" id="cartField"/>
+      <input type="hidden" name="payment_method" id="payField"/>
+      <input type="hidden" name="buyer_tin" id="tinField"/>
+      <input type="hidden" name="buyer_name" id="nameField"/>
+      <button class="btn btn-solid btn-block" type="submit" id="coBtn" disabled>Charge &amp; issue fiscal receipt</button>
+    </form>
+    <p class="muted" style="font-size:11px;margin-top:10px;text-align:center">Signed QR · registered with MoR</p>
+  </div>
+</div>
+
+<script>
+var cart = [];
+function fmt(n){ return n.toFixed(2); }
+function addItem(){
+  var name = document.getElementById('iName').value.trim();
+  var price = parseFloat(document.getElementById('iPrice').value);
+  var qty = parseFloat(document.getElementById('iQty').value) || 1;
+  if(!name || !(price > 0)) return;
+  cart.push({name:name, code:name.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,15)||'ITEM', price:price, qty:qty, discount:0});
+  document.getElementById('iName').value=''; document.getElementById('iPrice').value=''; document.getElementById('iQty').value='1';
+  document.getElementById('iName').focus();
+  render();
+}
+function rm(i){ cart.splice(i,1); render(); }
+function render(){
+  var rows = document.getElementById('cartRows'); rows.innerHTML='';
+  var total = 0;
+  cart.forEach(function(li,i){
+    total += li.price*li.qty - li.discount;
+    var div = document.createElement('div');
+    div.style.cssText='display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13.5px';
+    div.innerHTML = '<span>'+li.name+' <span class="muted" style="font-size:11px">'+li.qty+' × '+fmt(li.price)+'</span></span>'
+      + '<span>'+fmt(li.price*li.qty)+' <a href="#" onclick="rm('+i+');return false" style="color:var(--red);text-decoration:none;margin-left:6px">×</a></span>';
+    rows.appendChild(div);
+  });
+  var pre = total/1.15, vat = total-pre;   /* VAT-inclusive pricing */
+  document.getElementById('tSub').textContent = fmt(pre);
+  document.getElementById('tVat').textContent = fmt(vat);
+  document.getElementById('tTot').textContent = 'ETB '+fmt(total);
+  document.getElementById('coBtn').disabled = cart.length===0;
+}
+document.getElementById('coForm').addEventListener('submit', function(){
+  document.getElementById('cartField').value = JSON.stringify(cart);
+  document.getElementById('payField').value = document.getElementById('pay').value;
+  document.getElementById('tinField').value = document.getElementById('bTin').value;
+  document.getElementById('nameField').value = document.getElementById('bName').value;
+  var b=document.getElementById('coBtn'); b.disabled=true; b.textContent='Registering with MoR…';
+});
+document.getElementById('iPrice').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addItem(); }});
+if (matchMedia('(max-width: 760px)').matches) document.getElementById('posGrid').style.gridTemplateColumns='1fr';
+</script>
+{% endblock %}

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <meta name="theme-color" content="#10b981"/>
+  <title>{% block title %}Receipt{% endblock %} · Receipt POS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@800;900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0b0e0c; --bg-2:#101512; --ink:#e9efe9; --muted:#93a096;
+      --accent:#10b981; --accent-2:#34d399; --amber:#f0b429; --line:#2a332c;
+      --paper:#f7f5ee; --paper-ink:#1a201b; --paper-muted:#5b635c;
+      --red:#f0656f;
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:15px;line-height:1.6}
+    a{color:inherit}
+    h1,h2,h3,.display{font-family:'Archivo','Arial Black',sans-serif;font-weight:900;text-transform:uppercase;letter-spacing:.5px;line-height:1.05}
+    ::selection{background:var(--accent);color:#04130c}
+    .container{max-width:1100px;margin:0 auto;padding:0 24px}
+    .muted{color:var(--muted)}
+    .accent{color:var(--accent)}
+    /* topbar */
+    .topbar{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(8px);border-bottom:2px dashed var(--line)}
+    .topbar-inner{display:flex;align-items:center;gap:22px;padding:12px 24px;max-width:1100px;margin:0 auto}
+    .brand{display:flex;align-items:baseline;gap:8px;text-decoration:none;font-weight:700}
+    .brand .mark{color:var(--accent);font-size:19px;transform:translateY(2px)}
+    .brand .name{font-family:'Archivo',sans-serif;font-weight:900;font-size:18px}
+    .nav{display:flex;gap:6px;margin-left:auto;align-items:center}
+    .nav a{text-decoration:none;font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);padding:8px 12px;border:1px dashed transparent}
+    .nav a:hover,.nav a.active{color:var(--accent);border-color:var(--line)}
+    /* buttons */
+    .btn{display:inline-block;font-family:inherit;font-size:13px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;text-decoration:none;padding:12px 22px;cursor:pointer;border:2px solid var(--accent);background:transparent;color:var(--ink)}
+    .btn-solid{background:var(--accent);color:#04130c;box-shadow:4px 4px 0 color-mix(in srgb,var(--accent) 32%,transparent)}
+    .btn-solid:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 color-mix(in srgb,var(--accent) 32%,transparent)}
+    .btn-ghost{border:2px dashed var(--line);color:var(--ink)}
+    .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+    .btn-sm{padding:8px 14px;font-size:12px}
+    .btn-block{display:block;width:100%;text-align:center}
+    /* cards / fields */
+    .card{border:2px dashed var(--line);padding:22px 22px}
+    .field{display:block;margin-bottom:16px}
+    .field label{display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+    .field input,.field select{width:100%;background:var(--bg-2);border:1px solid var(--line);color:var(--ink);font:inherit;padding:12px 13px}
+    .field input:focus,.field select:focus{outline:none;border-color:var(--accent)}
+    .kicker{color:var(--accent);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
+    .err{border:1px dashed var(--red);color:var(--red);padding:11px 14px;font-size:13px;margin-bottom:16px}
+    .pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 9px;border:1px solid var(--line)}
+    .pill.ok{color:var(--accent);border-color:var(--accent)}
+    .pill.warn{color:var(--amber);border-color:var(--amber)}
+    .pill.bad{color:var(--red);border-color:var(--red)}
+    /* leader dots */
+    .lead-row{display:flex;align-items:baseline;gap:10px;padding:7px 0;font-size:14px}
+    .lead-row .fill{flex:1;border-bottom:2px dotted var(--line);transform:translateY(-4px)}
+    .lead-row .val{color:var(--accent);font-weight:700}
+    /* table */
+    table{width:100%;border-collapse:collapse}
+    th,td{text-align:left;padding:10px 8px;border-bottom:1px dashed var(--line);font-size:13.5px}
+    th{color:var(--muted);font-size:11px;letter-spacing:1.2px;text-transform:uppercase;font-weight:600}
+    .dash{border:0;border-top:2px dashed var(--line);margin:26px 0}
+    main{padding:34px 0 70px}
+    @media(max-width:640px){.nav a{padding:7px 8px}.container{padding:0 16px}}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="{% if m %}/app{% else %}/app/login{% endif %}">
+        <span class="mark">🧾</span><span class="name">Receipt</span>
+      </a>
+      {% if m %}
+      <nav class="nav">
+        <a href="/app" class="{% block nav_home %}{% endblock %}">Dashboard</a>
+        <a href="/app/pos" class="{% block nav_pos %}{% endblock %}">Sell</a>
+        <a href="/app/receipts" class="{% block nav_receipts %}{% endblock %}">Receipts</a>
+        <a href="/app/settings" class="{% block nav_settings %}{% endblock %}">Settings</a>
+        <a href="/app/logout">Logout</a>
+      </nav>
+      {% endif %}
+    </div>
+  </header>
+  <main><div class="container">{% block content %}{% endblock %}</div></main>
+</body>
+</html>

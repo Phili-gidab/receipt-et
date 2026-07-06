@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Create account{% endblock %}
+{% block content %}
+<div style="max-width:520px;margin:6vh auto 0">
+  <p class="kicker">Create your business account</p>
+  <h1 style="font-size:26px;margin-bottom:6px">Register your business</h1>
+  <p class="muted" style="margin-bottom:22px;font-size:14px">
+    Enter your business details. You'll add your EIRMS credentials on the next screen —
+    then you can start issuing government-verified receipts.
+  </p>
+  {% if error %}<div class="err">{{ error }}</div>{% endif %}
+  <form method="post" action="/app/signup" class="card">
+    <div class="field">
+      <label>Company TIN</label>
+      <input name="tin" required minlength="10" maxlength="10" pattern="[0-9]{10}"
+             placeholder="10-digit company TIN" value="{{ tin or '' }}"/>
+    </div>
+    <div class="field">
+      <label>Legal name (exactly as MoR records it)</label>
+      <input name="legal_name" required placeholder="e.g. TSION CAFE PLC" value="{{ legal_name or '' }}"/>
+    </div>
+    <div class="field">
+      <label>Mobile (Ethiopia)</label>
+      <input name="phone" required placeholder="09… or 2519…" value="{{ phone or '' }}"/>
+      <div class="muted" style="font-size:11.5px;margin-top:6px">
+        We text a verification code — enter it on the next screen to finish signup.
+      </div>
+    </div>
+    <button class="btn btn-solid btn-block" type="submit">Register</button>
+  </form>
+  <p class="muted" style="text-align:center;margin-top:16px;font-size:13px">
+    Already have an account? <a class="accent" href="/app/login">Sign in</a>
+  </p>
+</div>
+{% endblock %}

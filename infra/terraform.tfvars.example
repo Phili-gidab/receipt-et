@@ -1,0 +1,32 @@
+##############################################################################
+# Receipt infra — example variables file.
+#
+# Copy to a private, GIT-IGNORED file (e.g. sandbox.tfvars) and fill in real
+# values, then:  terraform plan  -var-file=sandbox.tfvars
+#
+# NEVER commit a tfvars file that contains db_password or other secrets.
+##############################################################################
+
+# --- Required ---------------------------------------------------------------
+db_password = "change-me-strong-password"   # RDS master password (sensitive)
+
+# --- Commonly overridden ----------------------------------------------------
+# project_name  = "receipt"
+# environment   = "sandbox"
+# aws_region    = "eu-central-1"
+# aws_profile   = "delta"
+# instance_type = "t3.small"
+# db_instance_class = "db.t3.micro"
+# domain        = "receipt.com.et"
+
+# Lock SSH to your own IP. Leaving 0.0.0.0/0 exposes port 22 to the world.
+# allowed_ssh_cidr = "203.0.113.10/32"
+
+# Paste an SSH public key to create a key pair (optional — SSM works without it).
+# ssh_public_key = "ssh-ed25519 AAAA... you@host"
+
+# Pin a specific Ubuntu 22.04 AMI, or leave empty to auto-resolve the latest.
+# ami_id = ""
+
+# After you build + push the image to ECR, set this so the host runs it on boot.
+# fiscal_core_image = "123456789012.dkr.ecr.eu-central-1.amazonaws.com/receipt/fiscal-core:latest"

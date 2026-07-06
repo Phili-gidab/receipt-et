@@ -1,0 +1,21 @@
+# --- defense in depth: secrets must never land in git (per-dir ignores also apply) ---
+**/.env
+**/.env.*
+!**/.env.example
+**/secrets/
+infra/keys/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+*.key
+*.pem
+
+# build/runtime
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.vercel/

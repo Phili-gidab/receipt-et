@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block nav_settings %}active{% endblock %}
+{% block content %}
+<p class="kicker">Configuration</p>
+<h1 style="font-size:26px;margin-bottom:8px">Business & EIRMS settings</h1>
+<p class="muted" style="font-size:13.5px;margin-bottom:18px">
+  Credentials come from your MoR portal source registration and INSA certificate issuance.
+  Values are stored as encrypted references — never shown back once saved.
+</p>
+
+{% if ok %}<div class="card" style="border-color:var(--accent);color:var(--accent);margin-bottom:14px">✓ {{ ok }}</div>{% endif %}
+{% if error %}<div class="err" style="margin-bottom:14px">{{ error }}</div>{% endif %}
+
+<form method="post" action="/app/settings">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:22px" id="setGrid">
+
+  <div class="card">
+    <p class="kicker">EIRMS credentials</p>
+    <div class="field"><label>Client ID {% if s.client_id %}<span style="color:var(--accent)">· set ✓</span>{% endif %}</label>
+      <input name="client_id" placeholder="{{ 'saved — enter to replace' if s.client_id else 'from MoR portal' }}"/></div>
+    <div class="field"><label>Client secret {% if s.client_secret %}<span style="color:var(--accent)">· set ✓</span>{% endif %}</label>
+      <input name="client_secret" type="password" placeholder="{{ 'saved — enter to replace' if s.client_secret else 'from MoR portal' }}"/></div>
+    <div class="field"><label>API key {% if s.api_key %}<span style="color:var(--accent)">· set ✓</span>{% endif %}</label>
+      <input name="api_key" type="password" placeholder="{{ 'saved — enter to replace' if s.api_key else 'from MoR portal' }}"/></div>
+    <div class="field"><label>EIMS base URL</label>
+      <input name="base_url" value="{{ m.base_url or 'https://core.mor.gov.et' }}"/></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="field"><label>System type</label>
+        <select name="system_type">
+          {% for t in ["POS","SAAS","AGGREGATOR"] %}
+          <option value="{{ t }}" {{ 'selected' if (m.system_type or 'POS') == t }}>{{ t }}</option>
+          {% endfor %}
+        </select></div>
+      <div class="field"><label>System number</label>
+        <input name="system_number" value="{{ m.system_number or '' }}" placeholder="from Source Management"/></div>
+    </div>
+    <label class="mono" style="font-size:12px;display:flex;gap:8px;align-items:center">
+      <input type="checkbox" name="tls_verify" value="1" {{ 'checked' if m.tls_verify }} style="width:auto"/>
+      Verify TLS (off for sandbox self-signed cert)
+    </label>
+  </div>
+
+  <div class="card">
+    <p class="kicker">INSA certificate & private key</p>
+    <div class="field"><label>Private key (PEM)
+      {% if key_present %}<span style="color:var(--accent)">· on file ✓</span>{% endif %}</label>
+      <textarea name="private_key_pem" rows="4" placeholder="-----BEGIN PRIVATE KEY----- … (paste to replace)"
+                style="width:100%;background:var(--bg-2);border:1px solid var(--line);color:var(--ink);font:11px/1.5 monospace;padding:10px"></textarea></div>
+    <div class="field"><label>Certificate chain (PEM)
+      {% if cert_present %}<span style="color:var(--accent)">· on file ✓ {{ cert_note }}</span>{% endif %}</label>
+      <textarea name="certificate_pem" rows="4" placeholder="-----BEGIN CERTIFICATE----- … (paste to replace)"
+                style="width:100%;background:var(--bg-2);border:1px solid var(--line);color:var(--ink);font:11px/1.5 monospace;padding:10px"></textarea></div>
+    <p class="muted" style="font-size:11.5px">
+      Generate the key + CSR with our tool, email the CSR to ica@insa.gov.et, then paste
+      the issued chain here. The private key never leaves this server.
+    </p>
+  </div>
+
+  <div class="card">
+    <p class="kicker">Seller record (must match MoR exactly — error 7017)</p>
+    <div class="field"><label>Legal name</label><input name="legal_name" value="{{ m.legal_name }}" required/></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="field"><label>VAT number</label><input name="vat_number" value="{{ m.vat_number or '' }}"/></div>
+      <div class="field"><label>Tax code</label>
+        <select name="tax_code">
+          {% for t in ["VAT15","VAT0","VATEX"] %}
+          <option value="{{ t }}" {{ 'selected' if (m.tax_code or 'VAT15') == t }}>{{ t }}</option>
+          {% endfor %}
+        </select></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+      <div class="field"><label>Region №</label><input name="region" value="{{ m.region or '' }}"/></div>
+      <div class="field"><label>City №</label><input name="city" value="{{ m.city or '' }}"/></div>
+      <div class="field"><label>Wereda №</label><input name="wereda" value="{{ m.wereda or '' }}"/></div>
+    </div>
+    <p class="muted" style="font-size:11.5px">Leave blank anything not confirmed in your MoR record — omitted fields are auto-filled by MoR. Wereda is required by the schema.</p>
+  </div>
+
+  <div class="card">
+    <p class="kicker">B2C default buyer ID (sandbox)</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="field"><label>ID type</label>
+        <select name="default_buyer_id_type">
+          {% for t in ["", "NID","KID","SID","WID","PST","DLS","MRS"] %}
+          <option value="{{ t }}" {{ 'selected' if (m.default_buyer_id_type or '') == t }}>{{ t or '—' }}</option>
+          {% endfor %}
+        </select></div>
+      <div class="field"><label>ID number</label><input name="default_buyer_id_number" value="{{ m.default_buyer_id_number or '' }}"/></div>
+    </div>
+    <p class="muted" style="font-size:11.5px">B2C invoices require a registered buyer ID (error 7004). Remove for production.</p>
+    <div style="display:flex;gap:12px;margin-top:14px">
+      <button class="btn btn-solid" type="submit" style="flex:1">Save settings</button>
+      <button class="btn btn-ghost" type="submit" formaction="/app/settings/test" style="flex:1">Save & test connection</button>
+    </div>
+    <p class="muted" style="font-size:11.5px;margin-top:10px;text-align:center">
+      “Test connection” signs a login request with your key and calls MoR /auth/login live.
+    </p>
+  </div>
+
+</div>
+</form>
+<script>if (matchMedia('(max-width: 860px)').matches) document.getElementById('setGrid').style.gridTemplateColumns='1fr';</script>
+{% endblock %}

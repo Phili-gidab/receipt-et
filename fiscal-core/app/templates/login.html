@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<div style="max-width:400px;margin:8vh auto 0">
+  <div style="text-align:center;margin-bottom:24px">
+    <div style="font-size:34px">🧾</div>
+    <h1 style="font-size:26px;margin-top:6px">Receipt</h1>
+    <p class="muted" style="font-size:13px">E-Receipt &amp; Cloud POS · ደረሰኝ</p>
+  </div>
+  <div class="card">
+    <p class="kicker">Sign in</p>
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+    <form method="post" action="/app/login">
+      <div class="field">
+        <label>Enter your phone or company TIN</label>
+        <input name="phone" inputmode="tel" placeholder="TIN or 09xx xxx xxx" autofocus required/>
+      </div>
+      <p class="muted" style="font-size:12px;margin-bottom:16px">We'll text you a code to sign in.</p>
+      <button class="btn btn-solid btn-block" type="submit">Continue</button>
+    </form>
+  </div>
+  <p class="muted" style="text-align:center;font-size:12px;margin-top:16px">
+    New business? <a class="accent" href="/">Get started</a>
+  </p>
+</div>
+<p class="muted" style="text-align:center;margin-top:16px;font-size:13px">
+  No account? <a class="accent" href="/app/signup">Create one</a>
+</p>
+{% endblock %}

@@ -1,0 +1,21 @@
+# Terraform state, plans, and local working files
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+
+# Variable files — may contain secrets (db_password, etc.). Never commit.
+*.tfvars
+!terraform.tfvars.example
+
+# Saved plan output
+*.tfplan
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# SSH keypair for EC2 — never commit private keys
+keys/
