@@ -190,7 +190,23 @@ def demo_charge(payload: dict | None = Body(None), db: Session = Depends(get_ses
     except Exception as exc:  # receipt is best-effort; invoice already registered
         logger.warning("demo.charge receipt failed: %s", exc)
 
-    pre = round(total / 1.15, 2)
+    # report what was actually REGISTERED (the wire payload), not our estimate —
+    # MoR-consistent line math can differ from sticker prices by a cent
+    import json as _json
+    try:
+        pl = _json.loads(doc.payload_json or "{}")
+        vals = pl.get("ValueDetails") or {}
+        reg_total = float(vals.get("TotalValue") or total)
+        reg_vat = float(vals.get("TaxValue") or 0)
+        reg_items = [
+            {"name": it.get("ProductDescription"), "qty": it.get("Quantity"),
+             "unit": it.get("UnitPrice"), "total": it.get("TotalLineAmount")}
+            for it in pl.get("ItemList") or []
+        ]
+    except Exception:
+        reg_total, reg_vat = total, round(total - total / 1.15, 2)
+        reg_items = [{"name": n, "qty": q, "unit": p, "total": round(p * q, 2)} for _, n, p, q in chosen]
+
     return JSONResponse({
         "ok": True,
         "irn": doc.irn,
@@ -198,13 +214,10 @@ def demo_charge(payload: dict | None = Body(None), db: Session = Depends(get_ses
         "docNo": doc.document_number,
         "date": (doc.registered_at or datetime.now(timezone.utc)).isoformat(),
         "qr": doc.qr_b64,
-        "total": total,
-        "preTax": pre,
-        "vat": round(total - pre, 2),
-        "items": [
-            {"name": name, "qty": qty, "unit": price, "total": round(price * qty, 2)}
-            for _, name, price, qty in chosen
-        ],
+        "total": reg_total,
+        "preTax": round(reg_total - reg_vat, 2),
+        "vat": reg_vat,
+        "items": reg_items,
     })
 
 

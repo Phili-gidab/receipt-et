@@ -255,21 +255,59 @@ def build_invoice(
         else:
             line_amount = float(raw["unit_price"]) * quantity - discount
 
-        # Unit-price-first math (sandbox-observed rule): MoR recomputes every
-        # line as round2(UnitPrice * Quantity * (1+rate)) from the UnitPrice WE
-        # send and rejects any drift ("expected 80.01 received 80.0"). Derive a
-        # 4dp pre-tax UnitPrice from the charged amount, then compute PreTax/
-        # Tax/TotalLineAmount exactly the way MoR will, so the reconstruction
-        # always lands on the cashier's cent.
+        # MoR line validation (sandbox-observed across three rejections): the
+        # gateway recomputes UnitPrice*Quantity*(1+rate), quantizes HALF_UP to
+        # the same number of decimals as the UnitPrice we sent, and requires
+        # TotalLineAmount to match EXACTLY ("expected 80.01 received 80.0" for
+        # a 2dp unit; "expected 2999.9999 received 3000.0" for a 4dp unit). So:
+        # send 2dp units and search the neighbouring cents for the unit whose
+        # reconstruction lands exactly on the charged amount; when no cent can
+        # (e.g. 80.00 @ VAT15 is unreachable), take the closest reconstructable
+        # total — the fiscal document then differs from the sticker by <=0.01,
+        # which is unavoidable under MoR's own arithmetic.
+        from decimal import ROUND_HALF_UP, Decimal
+
         rate = _vat_rate(tax_code)
-        qty_div = quantity or 1.0
-        if rate and vat_inclusive:
-            unit_price = round(line_amount / qty_div / (1 + rate / 100.0), 4)
-        else:
-            unit_price = round(line_amount / qty_div, 4)
-        pre_tax = round(unit_price * quantity, 2)
-        line_total = round(unit_price * quantity * (1 + rate / 100.0), 2)
-        tax_amount = round(line_total - pre_tax, 2)
+        q2 = Decimal("0.01")
+        d_qty = Decimal(str(quantity or 1))
+        factor = (Decimal(1) + Decimal(str(rate)) / Decimal(100)) if rate else Decimal(1)
+        d_line = Decimal(str(round(line_amount, 2)))
+        base = (d_line / d_qty / factor) if vat_inclusive or not rate else (d_line / d_qty)
+        base = base.quantize(q2, rounding=ROUND_HALF_UP)
+
+        def _is_tie(x: Decimal) -> bool:
+            # exact .xx5 remainder: HALF_UP vs HALF_EVEN disagree and MoR's
+            # tie-break is unknown — treat such candidates as ambiguous
+            return (x * 100) % 1 == Decimal("0.5")
+
+        target = d_line if (vat_inclusive or not rate) else (d_line * factor).quantize(q2, rounding=ROUND_HALF_UP)
+        rate_q = Decimal(str(rate)) / Decimal(100)
+        best = None  # (err, tie, cand, recon)
+        for cents in (0, 1, -1, 2, -2):
+            cand = base + Decimal(cents) / Decimal(100)
+            if cand <= 0:
+                continue
+            gross_prod = cand * d_qty * factor
+            tax_prod = cand * d_qty * rate_q
+            tie = _is_tie(gross_prod) or _is_tie(tax_prod)
+            recon = gross_prod.quantize(q2, rounding=ROUND_HALF_UP)
+            # ambiguity trumps drift: a tie may be rejected outright depending
+            # on MoR's tie-break, while a couple cents of drift always registers
+            key = (tie, abs(recon - target))
+            if best is None or key < best[:2]:
+                best = (key[0], key[1], cand, recon)
+            if key == (False, 0):
+                break
+        _, _, best_unit, best_total = best
+
+        # Each field is validated independently against its own product from
+        # the sent unit ("taxAmount expected 26.0870 received 26.09"), so
+        # quantize each product directly — never derive one by subtraction.
+        rate_frac = Decimal(str(rate)) / Decimal(100)
+        unit_price = float(best_unit)
+        line_total = float(best_total)
+        pre_tax = float((best_unit * d_qty).quantize(q2, rounding=ROUND_HALF_UP))
+        tax_amount = float((best_unit * d_qty * rate_frac).quantize(q2, rounding=ROUND_HALF_UP))
 
         item_list.append({
             "LineNumber": idx,
