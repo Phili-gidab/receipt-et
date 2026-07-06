@@ -389,17 +389,22 @@ def _apply_settings(request, merchant, db, form):
         sec.private_key_ref = _write_secret_file(merchant, "private_key.key", form["private_key_pem"])
     if form.get("certificate_pem", "").strip():
         sec.certificate_ref = _write_secret_file(merchant, "certificate.pem", form["certificate_pem"])
-    # merchant fields
+    # merchant fields — a field ABSENT from the form must never clear stored
+    # data (partial/programmatic posts would silently wipe the seller record,
+    # which then fails the VAT rule / MoR 1028). Present-but-blank does clear.
     merchant.base_url = form.get("base_url", "").strip() or merchant.base_url
     merchant.system_type = form.get("system_type") or merchant.system_type
-    merchant.system_number = form.get("system_number", "").strip() or None
-    merchant.tls_verify = form.get("tls_verify") == "1"
-    merchant.legal_name = form.get("legal_name", "").strip() or merchant.legal_name
+    if "system_number" in form:
+        merchant.system_number = form["system_number"].strip() or None
+    if "legal_name" in form:  # full settings form present -> checkbox semantics valid
+        merchant.tls_verify = form.get("tls_verify") == "1"
+        merchant.legal_name = form["legal_name"].strip() or merchant.legal_name
     for f in ("vat_number", "region", "city", "wereda", "default_buyer_id_number"):
-        v = form.get(f, "").strip()
-        setattr(merchant, f, v or None)
+        if f in form:
+            setattr(merchant, f, form[f].strip() or None)
     merchant.tax_code = form.get("tax_code") or merchant.tax_code
-    merchant.default_buyer_id_type = form.get("default_buyer_id_type") or None
+    if "default_buyer_id_type" in form:
+        merchant.default_buyer_id_type = form["default_buyer_id_type"] or None
     db.commit()
     mor_client.clear_token_cache(merchant.id)
 
