@@ -384,6 +384,16 @@ def receipt_refund(request: Request, doc_id: int, reason: str = Form(""),
         return _back_to_doc(done.id, ok="Already refunded — this is the credit note.")
     ref = base_ref if not prior else f"{base_ref}-{uuid.uuid4().hex[:4]}"
 
+    # MoR 7030: the note's transaction type (B2B/B2C) must match the original —
+    # carry the original invoice's buyer over to the credit note.
+    try:
+        orig_buyer = (json.loads(doc.payload_json or "{}").get("BuyerDetails")) or {}
+    except Exception:
+        orig_buyer = {}
+    buyer = None
+    if orig_buyer.get("Tin"):
+        buyer = {"legal_name": orig_buyer.get("LegalName") or "Customer", "tin": orig_buyer["Tin"]}
+
     note = {
         "transaction_ref": ref,
         "amount": float(doc.amount),
@@ -392,6 +402,7 @@ def receipt_refund(request: Request, doc_id: int, reason: str = Form(""),
         "related_irn": doc.irn,
         "reason": (reason.strip() or "Refund / return of goods")[:300],
         "items": items,
+        "buyer": buyer,
     }
     try:
         cre = registration.issue_credit_note(db, merchant, note)

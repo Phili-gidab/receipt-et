@@ -141,6 +141,12 @@
     {% endif %}
 
     {% if doc.error %}
+    {% if 'buyer not found' in doc.error %}
+    <div class="err" style="margin-top:16px;border-color:var(--amber);color:var(--amber)">
+      <b>Buyer TIN not registered with MoR.</b> Double-check the buyer's TIN, or
+      leave the buyer fields blank for a walk-in (B2C) sale — then ring the sale again.
+    </div>
+    {% endif %}
     <div class="err" style="margin-top:16px;word-break:break-all">
       <b>MoR error:</b> {{ doc.error }}
     </div>
