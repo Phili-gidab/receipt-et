@@ -13,6 +13,9 @@
     {% if registered %}
     <button class="btn btn-ghost btn-sm" type="button" id="shareBtn"
             onclick="navigator.clipboard.writeText(location.origin + '{{ share_url }}').then(()=>{this.textContent='✓ Link copied'});">⇪ Share link</button>
+    <form method="post" action="/app/receipt/{{ doc.id }}/verify" style="display:inline">
+      <button class="btn btn-ghost btn-sm" type="submit">⚖ Verify at MoR</button>
+    </form>
     {% endif %}
     <a class="btn btn-solid btn-sm" href="/app/pos">+ New sale</a>
   </span>

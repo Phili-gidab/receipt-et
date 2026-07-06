@@ -314,6 +314,31 @@ def receipt_print(request: Request, doc_id: int, fmt: str = "thermal", db: Sessi
     return HTMLResponse(content=html)
 
 
+@router.post("/receipt/{doc_id}/verify")
+def receipt_verify(request: Request, doc_id: int, db: Session = Depends(get_session)):
+    """Ask MoR live whether it knows this document (settles 'is it really registered?')."""
+    merchant, doc = _load_doc(request, db, doc_id)
+    if merchant is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    if doc is None:
+        return RedirectResponse(url="/app/receipts", status_code=303)
+    if not doc.irn:
+        return _back_to_doc(doc_id, err="No IRN on this document — nothing to verify.")
+    try:
+        res = registration.verify_invoice_for_document(db, merchant, doc.irn)
+    except Exception as exc:
+        return _back_to_doc(doc_id, err=f"Verify failed: {str(exc)[:250]}")
+    if res.get("ok"):
+        body = (res.get("mor") or {}).get("body") or {}
+        dd = body.get("DocumentDetails") or {}
+        return _back_to_doc(doc_id, ok=(
+            f"MoR confirms this document: {dd.get('Type', doc.doc_type)} "
+            f"#{dd.get('DocumentNumber', doc.document_number)} · {body.get('TransactionType', '')} "
+            f"· registered {dd.get('Date', '')} — straight from MoR's database."
+        ))
+    return _back_to_doc(doc_id, err="MoR did not recognise this IRN.")
+
+
 def _back_to_doc(doc_id: int, *, ok: str = "", err: str = "") -> RedirectResponse:
     from urllib.parse import quote
     qs = f"?ok={quote(ok)}" if ok else (f"?err={quote(err)}" if err else "")
