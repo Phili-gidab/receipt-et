@@ -32,7 +32,7 @@ export default function LiveDemo() {
           sandbox by this platform. Same engine, same cryptography as production.
         </p>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "clamp(24px,4vw,56px)", alignItems: "start" }}>
+        <div className="split-demo">
           {/* cashier side */}
           <div style={{ border: "1.5px dashed var(--line)", padding: 26, background: "var(--paper)", color: "var(--paper-ink)" }}>
             <div className="mono" style={{ fontSize: 11, letterSpacing: ".2em", color: "var(--green)", marginBottom: 16 }}>POINT OF SALE — CASHIER VIEW</div>

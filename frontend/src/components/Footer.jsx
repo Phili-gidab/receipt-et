@@ -1,4 +1,64 @@
+import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { APP } from "../config.js";
+
+function TearStrip() {
+  const [torn, setTorn] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const CODE = "PILOT-2018";
+  return (
+    <div style={{ position: "relative" }}>
+      <AnimatePresence>
+        {!torn && (
+          <motion.div
+            key="strip"
+            className="mono"
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.5}
+            onDragEnd={(_, info) => Math.abs(info.offset.x) > 70 && setTorn(true)}
+            onClick={() => setTorn(true)}
+            whileHover={{ rotate: 0.5 }}
+            exit={{ x: 180, y: 120, rotate: 12, opacity: 0, transition: { duration: 0.55, ease: [0.3, 0, 0.7, 0.2] } }}
+            style={{ cursor: "grab", background: "var(--paper)", color: "var(--paper-muted)", borderTop: "2px dashed var(--line)", padding: "15px 22px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, fontSize: 11, letterSpacing: ".16em", userSelect: "none", touchAction: "pan-y" }}
+          >
+            <span>✂ TEAR ALONG THE PERFORATION</span>
+            <span style={{ whiteSpace: "nowrap" }}>PULL →</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {torn && (
+        <motion.div
+          initial={{ opacity: 0, y: -8, rotate: 0 }}
+          animate={{ opacity: 1, y: 0, rotate: -1.2 }}
+          transition={{ delay: 0.3, duration: 0.45 }}
+          className="paper tear-bottom"
+          style={{ padding: "22px 22px 28px", color: "var(--paper-ink)", position: "relative" }}
+        >
+          <span className="stamp" style={{ right: 16, top: 12 }}>Founding merchant</span>
+          <div className="mono" style={{ fontSize: 10.5, letterSpacing: ".2em", color: "var(--paper-muted)" }}>
+            YOU KEPT THE STUB — IT'S WORTH SOMETHING
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", margin: "12px 0 8px" }}>
+            <span className="mono" style={{ fontWeight: 700, fontSize: "clamp(22px,4vw,30px)", letterSpacing: ".08em" }}>{CODE}</span>
+            <button
+              className="mono"
+              onClick={() => { navigator.clipboard?.writeText(CODE); setCopied(true); setTimeout(() => setCopied(false), 1600); }}
+              style={{ border: "1.5px dashed var(--line)", background: "transparent", color: "var(--paper-ink)", padding: "6px 12px", fontSize: 11, letterSpacing: ".14em", cursor: "pointer" }}
+            >
+              {copied ? "COPIED ✓" : "COPY CODE"}
+            </button>
+          </div>
+          <div style={{ fontSize: 13.5, color: "var(--paper-muted)" }}>
+            Free onboarding + 3 months of Business for the first 50 pilot merchants.
+            Mention the code when you sign up.
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
 const tally = [
   ["SETUP TIME", "minutes"],
   ["HARDWARE REQUIRED", "none"],
@@ -38,14 +98,14 @@ export default function Footer() {
               <a className="btn" href="#pricing" style={{ border: "1.5px dashed #3a453c", color: "#c9d3ca" }}>View pricing</a>
             </div>
           </div>
-          <div className="cut" style={{ paddingBottom: 0 }}><span className="scissors">✂</span><span style={{ marginLeft: "auto" }}>TEAR HERE</span></div>
+          <TearStrip />
         </div>
       </section>
 
       {/* footer */}
       <footer style={{ borderTop: "1px dashed var(--line)", padding: "44px 0 34px" }}>
         <div className="container">
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr repeat(3,.8fr)", gap: 28 }}>
+          <div className="footer-grid">
             <div>
               <div style={{ fontWeight: 900, fontSize: 20 }}>Receipt<span style={{ color: "var(--green)" }}>.</span></div>
               <p className="mono" style={{ fontSize: 12, color: "var(--muted)", marginTop: 10, lineHeight: 1.8, maxWidth: 280 }}>

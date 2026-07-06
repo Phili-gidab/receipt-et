@@ -49,28 +49,51 @@ export default function Hero() {
     };
     fit();
 
-    const PEEK = 330; // px of paper tail visible before scrolling (totals+QR+tear)
     const ctx = gsap.context(() => {
       if (reduced) { setSynced(true); return; }
       gsap.set(".rcpt-registered", { autoAlpha: 0 });
 
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: root.current,
-          start: "top top",
-          end: "+=75%",
-          scrub: 0.35,
-          pin: true,
-          anticipatePin: 1,
-          invalidateOnRefresh: true,
-          onUpdate: (self) => setSynced(self.progress > 0.78),
-        },
-      });
-      tl.fromTo(paperRef.current,
-          { y: () => -(paperRef.current.offsetHeight - PEEK) },
+      const feed = (tl, peek) => tl
+        .fromTo(paperRef.current,
+          { y: () => -(paperRef.current.offsetHeight - peek) },
           { y: 0, ease: "none", duration: 8 }, 0)
-        .to(".rcpt-registered", { autoAlpha: 1, duration: 0.6 }, 7.2)
-        .fromTo(".hero-copy", { yPercent: 0 }, { yPercent: -3, ease: "none", duration: 8 }, 0);
+        .to(".rcpt-registered", { autoAlpha: 1, duration: 0.6 }, 7.2);
+
+      const mm = gsap.matchMedia();
+
+      // Desktop: pin the section, scrub the paper out while the page holds.
+      mm.add("(min-width: 881px)", () => {
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: root.current,
+            start: "top top",
+            end: "+=75%",
+            scrub: 0.35,
+            pin: true,
+            anticipatePin: 1,
+            invalidateOnRefresh: true,
+            onUpdate: (self) => setSynced(self.progress > 0.78),
+          },
+        });
+        feed(tl, 330);
+        tl.fromTo(".hero-copy", { yPercent: 0 }, { yPercent: -3, ease: "none", duration: 8 }, 0);
+      });
+
+      // Mobile: receipt stacks below the copy — no pin (it would print below
+      // the fold). Scrub against the slot's own trip through the viewport.
+      mm.add("(max-width: 880px)", () => {
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: slotRef.current,
+            start: "top 82%",
+            end: "top 18%",
+            scrub: 0.35,
+            invalidateOnRefresh: true,
+            onUpdate: (self) => setSynced(self.progress > 0.78),
+          },
+        });
+        feed(tl, Math.min(300, window.innerHeight * 0.4));
+      });
     }, root);
 
     // Re-measure once webfonts land (metrics shift), then refresh triggers.
@@ -87,7 +110,7 @@ export default function Hero() {
 
   return (
     <section ref={root} id="top" style={{ minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 70, overflow: "hidden" }}>
-      <div className="container" style={{ display: "grid", gridTemplateColumns: "1.08fr .92fr", gap: "clamp(28px,5vw,80px)", alignItems: "start", width: "100%" }}>
+      <div className="container hero-grid">
         {/* ---- left copy ---- */}
         <div className="hero-copy" style={{ paddingTop: 44 }}>
           <div className="kicker">ADDIS ABABA · ETB <span className="dots" /> POINT OF SALE</div>

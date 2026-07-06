@@ -174,3 +174,15 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .barcode { height:34px; width:150px; margin:0 auto;
   background: repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 5px,
     currentColor 5px 9px, transparent 9px 12px, currentColor 12px 13px, transparent 13px 17px); opacity:.65; }
+
+/* --- responsive layout: fixed-column grids collapse on phones --- */
+.hero-grid { display: grid; grid-template-columns: 1.08fr .92fr; gap: clamp(28px,5vw,80px); align-items: start; width: 100%; }
+.split-offline { display: grid; grid-template-columns: .9fr 1.1fr; gap: clamp(28px,5vw,72px); align-items: center; }
+.split-demo { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(24px,4vw,56px); align-items: start; }
+.footer-grid { display: grid; grid-template-columns: 1.2fr repeat(3,.8fr); gap: 28px; }
+
+@media (max-width: 880px) {
+  .hero-grid, .split-offline, .split-demo { grid-template-columns: 1fr; }
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+  .hero-copy { padding-top: 12px !important; }
+}

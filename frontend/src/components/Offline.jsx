@@ -10,7 +10,7 @@ const checks = [
 export default function Offline() {
   return (
     <section id="offline" className="section" style={{ background: "var(--bg-2)" }}>
-      <div className="container" style={{ display: "grid", gridTemplateColumns: "0.9fr 1.1fr", gap: "clamp(28px,5vw,72px)", alignItems: "center" }}>
+      <div className="container split-offline">
         {/* contingency-mode card */}
         <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-60px" }} transition={{ duration: 0.55 }}
           style={{ position: "relative", border: "1.5px dashed var(--line)", padding: "44px 28px 28px", background: "var(--paper)", color: "var(--paper-ink)" }}>
