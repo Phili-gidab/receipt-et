@@ -190,3 +190,25 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 /* hero print-head cursor: steady block while lines print, then blinks */
 @keyframes rc-blink { 0%, 54% { opacity: 1; } 55%, 100% { opacity: 0; } }
 .cursor-blink { animation: rc-blink 1.05s steps(1) infinite; animation-delay: 1.7s; }
+
+/* --- responsive nav: links/actions collapse into the ≡ MENU dropdown --- */
+.nav-burger { display: none; background: none; border: 0; cursor: pointer; }
+@media (max-width: 880px) {
+  .nav-links, .nav-actions { display: none !important; }
+  .nav-burger { display: inline-flex !important; }
+}
+@media (max-width: 620px) {
+  .nav-tag { display: none; }
+}
+
+/* --- small-phone tightening (nav row is ~460px at natural size) --- */
+html { overflow-x: clip; }
+@media (max-width: 520px) {
+  .burger-label { display: none; }
+  .nav-cta { padding: 9px 13px !important; font-size: 11px !important; }
+}
+@media (max-width: 430px) {
+  .kicker { font-size: 10px; }
+  .kicker .dots { flex: 0 1 22px; }
+  .hero-copy h1 { font-size: clamp(28px, 8.6vw, 38px) !important; }
+}
