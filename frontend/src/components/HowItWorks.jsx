@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import PrintReveal from "./PrintReveal.jsx";
 
 const steps = [
   { n: "01", t: "Sell", d: "Ring up the sale on the web POS — phone, tablet or desktop. Amharic-friendly, keyboard-fast, cashier-simple." },
@@ -12,7 +13,7 @@ export default function HowItWorks() {
     <section id="how" className="section" style={{ background: "var(--bg-2)" }}>
       <div className="container">
         <div className="kicker">HOW IT WORKS <span className="dots" /> FOUR STEPS</div>
-        <h2 className="h2">From “thank you”<br />to <em>tax-office truth.</em></h2>
+        <PrintReveal className="h2">From “thank you”<br />to <em>tax-office truth.</em></PrintReveal>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 18, marginTop: 44 }}>
           {steps.map((s, i) => (
             <motion.div key={s.n}

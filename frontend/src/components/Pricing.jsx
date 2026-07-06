@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { APP } from "../config.js";
+import PrintReveal from "./PrintReveal.jsx";
 
 const plans = [
   {
@@ -24,7 +25,7 @@ export default function Pricing() {
     <section id="pricing" className="section">
       <div className="container">
         <div className="kicker-star">*** SIMPLE PRICING ***</div>
-        <h2 className="h2" style={{ textAlign: "center" }}>Transparent plans.<br /><em>No hidden fees.</em></h2>
+        <PrintReveal className="h2" style={{ textAlign: "center" }}>Transparent plans.<br /><em>No hidden fees.</em></PrintReveal>
         <p style={{ textAlign: "center", color: "var(--muted)", marginBottom: 46 }}>
           Start free and upgrade when you grow. Compliance is included on every plan.
         </p>

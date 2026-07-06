@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { APP } from "../config.js";
+import PrintReveal from "./PrintReveal.jsx";
 
 function TearStrip() {
   const [torn, setTorn] = useState(false);
@@ -86,9 +87,9 @@ export default function Footer() {
               </div>
             ))}
             <div style={{ borderTop: "1.5px dashed #2a332c", margin: "22px 0 30px" }} />
-            <h2 style={{ fontWeight: 900, textTransform: "uppercase", textAlign: "center", letterSpacing: "-0.02em", lineHeight: 1.04, fontSize: "clamp(30px,4.8vw,56px)", marginBottom: 16 }}>
+            <PrintReveal as="h2" style={{ fontWeight: 900, textTransform: "uppercase", textAlign: "center", letterSpacing: "-0.02em", lineHeight: 1.04, fontSize: "clamp(30px,4.8vw,56px)", marginBottom: 16 }}>
               Ready to sell<br /><span style={{ color: "#39d98a" }}>compliantly?</span>
-            </h2>
+            </PrintReveal>
             <p style={{ textAlign: "center", color: "#9aa79d", maxWidth: 520, margin: "0 auto 28px", fontSize: 15.5 }}>
               Join the pilot — we set you up, register your certificate, and your first
               government-verified receipt prints the same week.

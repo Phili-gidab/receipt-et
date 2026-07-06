@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import PrintReveal from "./PrintReveal.jsx";
 
 const faqs = [
   ["Is this legal / approved by the Ministry of Revenue?",
@@ -20,7 +21,7 @@ export default function FAQ() {
     <section id="faq" className="section">
       <div className="container" style={{ maxWidth: 860 }}>
         <div className="kicker">FAQ <span className="dots" /> STRAIGHT ANSWERS</div>
-        <h2 className="h2">Questions,<em> answered.</em></h2>
+        <PrintReveal className="h2">Questions,<em> answered.</em></PrintReveal>
         <div style={{ marginTop: 34 }}>
           {faqs.map(([q, a], i) => (
             <div key={i} style={{ borderBottom: "1.5px dashed var(--line)" }}>

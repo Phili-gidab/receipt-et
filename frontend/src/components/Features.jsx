@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import PrintReveal from "./PrintReveal.jsx";
 
 const feats = [
   ["01", "TAKE ANY PAYMENT", "Cash, card, telebirr and mobile money — recorded on the fiscal receipt.", "▤"],
@@ -16,7 +17,7 @@ export default function Features() {
     <section id="features" className="section">
       <div className="container">
         <div className="kicker-star">*** ITEMISED ***</div>
-        <h2 className="h2" style={{ textAlign: "center" }}>A full point of sale,<br /><em>not just a receipt printer.</em></h2>
+        <PrintReveal className="h2" style={{ textAlign: "center" }}>A full point of sale,<br /><em>not just a receipt printer.</em></PrintReveal>
         <p style={{ textAlign: "center", color: "var(--muted)", marginBottom: 50 }}>
           Receipt runs your counter and keeps you compliant at the same time — on the
           phone, tablet or computer you already own.

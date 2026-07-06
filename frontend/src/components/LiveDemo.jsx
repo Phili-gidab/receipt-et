@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RECEIPT } from "../data/receipt.js";
+import PrintReveal from "./PrintReveal.jsx";
 
 const STEPS = [
   ["Signing invoice — SHA512withRSA, INSA certificate", 700],
@@ -26,7 +27,7 @@ export default function LiveDemo() {
     <section id="demo" className="section">
       <div className="container">
         <div className="kicker">LIVE DEMO <span className="dots" /> NO MOCKUPS</div>
-        <h2 className="h2">Press charge. <em>Watch it become official.</em></h2>
+        <PrintReveal className="h2">Press charge. <em>Watch it become official.</em></PrintReveal>
         <p style={{ color: "var(--muted)", maxWidth: 560, marginBottom: 40 }}>
           The receipt below was genuinely registered in the Ministry of Revenue's EIMS
           sandbox by this platform. Same engine, same cryptography as production.

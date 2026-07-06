@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import PrintReveal from "./PrintReveal.jsx";
 
 const checks = [
   "Issue receipts with zero connectivity",
@@ -36,7 +37,7 @@ export default function Offline() {
 
         <div>
           <div className="kicker-star" style={{ textAlign: "left" }}>*** OFFLINE-FIRST ***</div>
-          <h2 className="h2" style={{ margin: "0 0 14px" }}>Never miss a sale<br />when the <em>network drops.</em></h2>
+          <PrintReveal className="h2" style={{ margin: "0 0 14px" }}>Never miss a sale<br />when the <em>network drops.</em></PrintReveal>
           <p style={{ color: "var(--muted)", fontSize: 16.5, maxWidth: 520, marginBottom: 22 }}>
             Power cuts and dead zones are a fact of business in Ethiopia. Receipt keeps
             selling — every sale is issued, saved and queued on the device, then

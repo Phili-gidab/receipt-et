@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { motion, useReducedMotion } from "framer-motion";
 import { HERO_QR } from "../data/heroqr.js";
 import { APP } from "../config.js";
 
@@ -37,6 +38,20 @@ export default function Hero() {
   const slotRef = useRef(null);
   const paperRef = useRef(null);
   const [synced, setSynced] = useState(false);
+  const prefersReduced = useReducedMotion();
+
+  // Each headline line prints in left→right like a thermal head pass.
+  const printLine = (child, i, extra = {}) => (
+    <motion.span
+      key={i}
+      style={{ display: "block", ...extra }}
+      initial={prefersReduced ? false : { clipPath: "inset(0 100% 0 0)" }}
+      animate={{ clipPath: "inset(0 -2% 0 0)" }}
+      transition={{ delay: 0.15 + i * 0.4, duration: 0.34, ease: "linear" }}
+    >
+      {child}
+    </motion.span>
+  );
 
   useLayoutEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -115,13 +130,14 @@ export default function Hero() {
         <div className="hero-copy" style={{ paddingTop: 44 }}>
           <div className="kicker">ADDIS ABABA · ETB <span className="dots" /> POINT OF SALE</div>
           <h1 style={{ fontWeight: 900, textTransform: "uppercase", letterSpacing: "-0.028em", lineHeight: 0.98, fontSize: "clamp(38px,5vw,72px)", margin: "24px 0 22px" }}>
-            Every sale,
-            <br />
-            a compliant
-            <br />
-            <span style={{ color: "var(--green)", ...nowrap }}>
-              fiscal receipt.<span style={{ display: "inline-block", width: ".4em", height: ".72em", background: "var(--green)", verticalAlign: "-0.05em", marginLeft: 8 }} />
-            </span>
+            {printLine("Every sale,", 0)}
+            {printLine("a compliant", 1)}
+            {printLine(
+              <span style={{ color: "var(--green)", ...nowrap }}>
+                fiscal receipt.<span className="cursor-blink" style={{ display: "inline-block", width: ".4em", height: ".72em", background: "var(--green)", verticalAlign: "-0.05em", marginLeft: 8 }} />
+              </span>,
+              2
+            )}
           </h1>
           <div className="pill" style={{ marginBottom: 24 }}>
             <span className="dot" /> Ethiopia is going QR-only. Be ready.

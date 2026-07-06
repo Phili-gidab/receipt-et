@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { RECEIPT } from "../data/receipt.js";
+import PrintReveal from "./PrintReveal.jsx";
 
 const cards = [
   { stamp: "Directive 188", t: "A valid QR on every receipt", d: "Every tax invoice must carry a unique, tax-authority-validated QR code. Receipt prints one on every sale — no separate fiscal machine to babysit." },
@@ -13,7 +14,7 @@ export default function Compliance() {
     <section id="compliance" className="section" style={{ background: "var(--bg-2)" }}>
       <div className="container">
         <div className="kicker-star">*** COMPLIANCE, HANDLED ***</div>
-        <h2 className="h2" style={{ textAlign: "center" }}>Running a shop is hard.<br /><em>Staying tax-compliant shouldn't be.</em></h2>
+        <PrintReveal className="h2" style={{ textAlign: "center" }}>Running a shop is hard.<br /><em>Staying tax-compliant shouldn't be.</em></PrintReveal>
         <p style={{ textAlign: "center", color: "var(--muted)", maxWidth: 620, margin: "0 auto 50px" }}>
           Ethiopia is moving from paper receipts to tax-validated, QR-coded invoices.
           Receipt keeps you compliant with the Ministry of Revenue's electronic
