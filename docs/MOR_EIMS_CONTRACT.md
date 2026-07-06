@@ -257,3 +257,29 @@ Non-secret (from `Delta_SPMU/scripts/configure-eims.sh`): `system_type=POS`,
 `api_key`, `vat_number` (sandbox seed `43256663343256663322`), `base_url` (sandbox host),
 `private_key.key`, `certificate.pem`, sandbox default buyer `IdType=NID`/
 `IdNumber=3333367896666`. Until supplied, the sandbox smoke test cannot authenticate.
+
+## Line-item & note validation rules (sandbox-observed 2026-07-06/07, encoded in `invoice_builder.py` / `webapp.py`)
+
+Learned from live rejections; all now enforced by the builder:
+
+1. **Per-field reconstruction, exact match.** The gateway recomputes each line
+   from the *sent* `UnitPrice`: `TotalLineAmount == UnitPrice·Qty·(1+rate)` and
+   `TaxAmount == UnitPrice·Qty·rate`, each quantized HALF_UP **to the same
+   number of decimals as the sent UnitPrice**, compared exactly. Evidence:
+   `expected 80.01 received 80.0` (2dp unit), `expected 2999.9999 received
+   3000.0` (4dp unit), `taxAmount expected 26.0870 received 26.09` (4dp unit).
+2. **Consequence:** send 2dp units and cent-search the unit whose
+   reconstruction lands on the charged amount; skip candidates whose products
+   hit an exact `.005` tie (MoR's tie-break rounding is unknown — HALF_UP vs
+   HALF_EVEN would disagree). Some stickers are unreachable (80.00 @ VAT15) —
+   accept ≤0.02 drift. Fuzzed 2006 price×qty cases: 0 ambiguous.
+3. **B2B buyer must exist**: unknown buyer TIN → `BUYER_TIN: (null) false :
+   buyer not found 503`. Sandbox: Delta's own TIN works as buyer.
+4. **Credit/debit notes must mirror the original invoice**: same items
+   (error 7020 "Item mismatch") **and** same transaction type/buyer
+   (error 7030 "Transaction type does not match"). Rebuild note items from the
+   original payload's ItemList and carry over BuyerDetails.
+5. **Portal UX traps** (not API issues): Invoice Report lists oldest-first
+   (newest docs on the last page); RRNs live under the separate Receipt
+   report; IRNs copied from wrapped UI text may contain line-breaks that
+   break the portal's exact-match IRN search. `/v1/verify` is authoritative.
