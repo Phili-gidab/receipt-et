@@ -351,21 +351,47 @@ def receipt_refund(request: Request, doc_id: int, reason: str = Form(""),
         return _back_to_doc(doc_id, err="Refunds need a registered invoice.")
     if not doc.amount:
         return _back_to_doc(doc_id, err="Original amount unknown — cannot refund.")
+
+    # MoR rule 7020: a credit note's items must MIRROR the original invoice's
+    # items (product/qty/tax code/unit) — rebuild them from the stored payload.
+    # Feeding TotalLineAmount/qty back through the builder re-finds the exact
+    # same UnitPrice, so the note reproduces the original lines to the cent.
+    try:
+        orig_items = (json.loads(doc.payload_json or "{}").get("ItemList")) or []
+    except Exception:
+        orig_items = []
+    if not orig_items:
+        return _back_to_doc(doc_id, err="Original items unavailable — cannot refund.")
+    items = [{
+        "item_code": it.get("ItemCode") or "",
+        "product_description": it.get("ProductDescription") or "",
+        "unit_price": float(it.get("TotalLineAmount") or 0) / float(it.get("Quantity") or 1),
+        "quantity": it.get("Quantity") or 1,
+        "discount": 0.0,
+        "nature_of_supplies": it.get("NatureOfSupplies") or "goods",
+        "unit": it.get("Unit") or "PCS",
+        "tax_code": it.get("TaxCode") or (merchant.tax_code or "VAT15"),
+    } for it in orig_items]
+
+    # idempotent on success; a FAILED attempt must not block the retry
+    base_ref = f"CRE-{doc.transaction_ref}"
+    prior = list(db.execute(
+        select(Document).where(Document.merchant_id == merchant.id,
+                               Document.transaction_ref.like(f"{base_ref}%"))
+    ).scalars())
+    done = next((p for p in prior if p.fiscal_status == FiscalStatus.REGISTERED), None)
+    if done is not None:
+        return _back_to_doc(done.id, ok="Already refunded — this is the credit note.")
+    ref = base_ref if not prior else f"{base_ref}-{uuid.uuid4().hex[:4]}"
+
     note = {
-        # idempotent: refunding twice returns the same credit note
-        "transaction_ref": f"CRE-{doc.transaction_ref}",
+        "transaction_ref": ref,
         "amount": float(doc.amount),
         "currency": doc.currency or "ETB",
         "payment_mode": "CASH",
         "related_irn": doc.irn,
         "reason": (reason.strip() or "Refund / return of goods")[:300],
-        "items": [{
-            "item_code": "REFUND",
-            "product_description": f"Refund — sale {doc.transaction_ref}"[:300],
-            "unit_price": float(doc.amount), "quantity": 1, "discount": 0.0,
-            "nature_of_supplies": "goods", "unit": "PCS",
-            "tax_code": merchant.tax_code or "VAT15",
-        }],
+        "items": items,
     }
     try:
         cre = registration.issue_credit_note(db, merchant, note)
