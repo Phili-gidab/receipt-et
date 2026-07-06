@@ -7,6 +7,13 @@ import PrintReveal from "./PrintReveal.jsx";
 const API_BASE = APP.replace(/\/app$/, "");
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Delta Aesthetics' till — mirrors the backend demo catalog exactly.
+const CATALOG = [
+  { code: "FACIAL", name: "Signature facial session", unit: 1500 },
+  { code: "SERUM", name: "Vitamin C brightening serum", unit: 950 },
+  { code: "SUNSCREEN", name: "SPF50+ daily sunscreen", unit: 650 },
+];
+
 const STEPS = [
   ["Signing invoice — SHA512withRSA, INSA certificate", 700],
   ["POST /v1/register → Ministry of Revenue EIMS", 1400],
@@ -18,14 +25,25 @@ export default function LiveDemo() {
   const [phase, setPhase] = useState("idle"); // idle | running | done
   const [lit, setLit] = useState(-1);
   const [live, setLive] = useState(null); // real just-registered doc, or null = replay
+  const [qty, setQty] = useState({ FACIAL: 1, SERUM: 1, SUNSCREEN: 0 });
+
+  const bump = (code, d) =>
+    setQty((q) => ({ ...q, [code]: Math.max(0, Math.min(5, (q[code] || 0) + d)) }));
+  const cart = CATALOG.filter((c) => qty[c.code] > 0);
+  const cartTotal = cart.reduce((s, c) => s + c.unit * qty[c.code], 0);
+  const cartPre = cartTotal / 1.15;
 
   const run = async () => {
-    if (phase === "running") return;
+    if (phase === "running" || !cart.length) return;
     setPhase("running"); setLit(-1); setLive(null);
     STEPS.forEach((_, i) => setTimeout(() => setLit(i), 500 + i * 700));
     // fire a REAL sandbox registration; fall back to the stored replay if the
     // backend is unreachable (e.g. https page calling the http sandbox host)
-    const charge = fetch(`${API_BASE}/demo/charge`, { method: "POST" })
+    const charge = fetch(`${API_BASE}/demo/charge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ qty }),
+    })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => (d && d.ok ? d : null))
       .catch(() => null);
@@ -51,20 +69,31 @@ export default function LiveDemo() {
         <div className="split-demo">
           {/* cashier side */}
           <div style={{ border: "1.5px dashed var(--line)", padding: 26, background: "var(--paper)", color: "var(--paper-ink)" }}>
-            <div className="mono" style={{ fontSize: 11, letterSpacing: ".2em", color: "var(--green)", marginBottom: 16 }}>POINT OF SALE — CASHIER VIEW</div>
-            {RECEIPT.items.map((it, i) => (
-              <div key={i} className="mono" style={{ ...row, padding: "10px 0", borderBottom: "1px dashed #d8d3c2", fontSize: 13.5 }}>
-                <span>{it.name}<span style={{ color: "var(--paper-muted)", fontSize: 11, display: "block" }}>{it.qty} × {it.unit.toFixed(2)}</span></span>
-                <b>{it.total.toFixed(2)}</b>
+            <div className="mono" style={{ fontSize: 11, letterSpacing: ".2em", color: "var(--green)", marginBottom: 4 }}>POINT OF SALE — CASHIER VIEW</div>
+            <div className="mono" style={{ fontSize: 10.5, color: "var(--paper-muted)", marginBottom: 14 }}>DELTA AESTHETICS · pilot merchant · sandbox</div>
+            {CATALOG.map((it) => (
+              <div key={it.code} className="mono" style={{ ...row, alignItems: "center", padding: "9px 0", borderBottom: "1px dashed #d8d3c2", fontSize: 13.5, opacity: qty[it.code] ? 1 : 0.45 }}>
+                <span>
+                  {it.name}
+                  <span style={{ color: "var(--paper-muted)", fontSize: 11, display: "block" }}>{it.code} · ETB {it.unit.toFixed(2)}</span>
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 10, whiteSpace: "nowrap" }}>
+                  <button onClick={() => bump(it.code, -1)} disabled={phase === "running"} aria-label={`less ${it.name}`}
+                          style={{ width: 26, height: 26, border: "1.5px dashed #b9b5a6", background: "none", color: "inherit", cursor: "pointer", fontSize: 14 }}>−</button>
+                  <b style={{ minWidth: 16, textAlign: "center" }}>{qty[it.code] || 0}</b>
+                  <button onClick={() => bump(it.code, 1)} disabled={phase === "running"} aria-label={`more ${it.name}`}
+                          style={{ width: 26, height: 26, border: "1.5px solid var(--paper-ink)", background: "none", color: "inherit", cursor: "pointer", fontSize: 14 }}>+</button>
+                  <b style={{ minWidth: 74, textAlign: "right" }}>{(it.unit * (qty[it.code] || 0)).toFixed(2)}</b>
+                </span>
               </div>
             ))}
-            <div className="mono" style={{ ...row, padding: "9px 0", color: "var(--paper-muted)", fontSize: 13 }}><span>Subtotal</span><span>{RECEIPT.preTax.toFixed(2)}</span></div>
-            <div className="mono" style={{ ...row, padding: "0 0 9px", color: "var(--paper-muted)", fontSize: 13 }}><span>VAT 15%</span><span>{RECEIPT.vat.toFixed(2)}</span></div>
+            <div className="mono" style={{ ...row, padding: "12px 0 0", color: "var(--paper-muted)", fontSize: 13 }}><span>Subtotal</span><span>{cartPre.toFixed(2)}</span></div>
+            <div className="mono" style={{ ...row, padding: "4px 0 9px", color: "var(--paper-muted)", fontSize: 13 }}><span>VAT 15%</span><span>{(cartTotal - cartPre).toFixed(2)}</span></div>
             <div className="mono" style={{ ...row, borderTop: "2px solid var(--paper-ink)", paddingTop: 12, fontWeight: 700, fontSize: 17 }}>
-              <span>TOTAL</span><span>ETB {RECEIPT.total.toFixed(2)}</span>
+              <span>TOTAL</span><span>ETB {cartTotal.toFixed(2)}</span>
             </div>
-            <button className="btn btn-solid" onClick={run} disabled={phase === "running"}
-                    style={{ width: "100%", justifyContent: "center", marginTop: 20, background: phase === "done" ? "var(--green-deep)" : undefined }}>
+            <button className="btn btn-solid" onClick={run} disabled={phase === "running" || !cart.length}
+                    style={{ width: "100%", justifyContent: "center", marginTop: 20, opacity: cart.length ? 1 : 0.5, background: phase === "done" ? "var(--green-deep)" : undefined }}>
               {phase === "idle" && "Charge & issue fiscal receipt"}
               {phase === "running" && "Registering with MoR…"}
               {phase === "done" && "✓ Receipt issued — scan the QR"}

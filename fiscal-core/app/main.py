@@ -17,7 +17,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI
+from fastapi import Body, Depends, FastAPI
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -103,14 +103,16 @@ def landing_demo():
 # --------------------------------------------------------------------------- #
 _DEMO_TIN = os.environ.get("DEMO_MERCHANT_TIN", "0107184904")
 _DEMO_HOURLY_CAP = int(os.environ.get("DEMO_HOURLY_CAP", "6"))
+# The demo merchant is Delta Aesthetics — sell what its till would actually ring up.
 _DEMO_ITEMS = [
-    ("MACCHIATO", "Macchiato", 70.0, 2),
-    ("AMBO", "Ambo water", 40.0, 1),
+    ("FACIAL", "Signature facial session", 1500.0),
+    ("SERUM", "Vitamin C brightening serum", 950.0),
+    ("SUNSCREEN", "SPF50+ daily sunscreen", 650.0),
 ]
 
 
 @app.post("/demo/charge", tags=["demo"])
-def demo_charge(db: Session = Depends(get_session)) -> JSONResponse:
+def demo_charge(payload: dict | None = Body(None), db: Session = Depends(get_session)) -> JSONResponse:
     merchant = db.execute(
         select(Merchant).where(Merchant.tin == _DEMO_TIN)
     ).scalar_one_or_none()
@@ -130,6 +132,20 @@ def demo_charge(db: Session = Depends(get_session)) -> JSONResponse:
     if recent >= _DEMO_HOURLY_CAP:
         return JSONResponse({"ok": False, "reason": "demo limit reached — try again in an hour"}, status_code=429)
 
+    # visitor-chosen quantities (clamped); default one of each, zero lines dropped
+    raw_qty = (payload or {}).get("qty") or {}
+    chosen = []
+    for code, name, price in _DEMO_ITEMS:
+        try:
+            qty = int(raw_qty.get(code, 1))
+        except (TypeError, ValueError):
+            qty = 1
+        qty = max(0, min(qty, 5))
+        if qty:
+            chosen.append((code, name, price, qty))
+    if not chosen:
+        return JSONResponse({"ok": False, "reason": "cart is empty"}, status_code=400)
+
     tax_code = merchant.tax_code or "VAT15"
     items = [
         {
@@ -137,7 +153,7 @@ def demo_charge(db: Session = Depends(get_session)) -> JSONResponse:
             "unit_price": price, "quantity": qty, "discount": 0.0,
             "nature_of_supplies": "goods", "unit": "PCS", "tax_code": tax_code,
         }
-        for code, name, price, qty in _DEMO_ITEMS
+        for code, name, price, qty in chosen
     ]
     total = round(sum(i["unit_price"] * i["quantity"] for i in items), 2)
     tx = {
@@ -187,9 +203,37 @@ def demo_charge(db: Session = Depends(get_session)) -> JSONResponse:
         "vat": round(total - pre, 2),
         "items": [
             {"name": name, "qty": qty, "unit": price, "total": round(price * qty, 2)}
-            for _, name, price, qty in _DEMO_ITEMS
+            for _, name, price, qty in chosen
         ],
     })
+
+
+# --------------------------------------------------------------------------- #
+# Public share link — customers open the fiscal document without an account.
+# Token is an HMAC over the doc id (see webapp.share_token), so links are
+# unguessable but permanent. Read-only; renders the print view.
+# --------------------------------------------------------------------------- #
+@app.get("/r/{doc_id}/{token}", include_in_schema=False)
+def shared_receipt(doc_id: int, token: str, fmt: str = "thermal",
+                   db: Session = Depends(get_session)):
+    import hmac as _hmac
+
+    from fastapi.responses import HTMLResponse
+
+    from app import printing
+    from app.webapp import share_token
+
+    if not _hmac.compare_digest(token, share_token(doc_id)):
+        return JSONResponse({"detail": "not found"}, status_code=404)
+    doc = db.get(Document, doc_id)
+    if doc is None:
+        return JSONResponse({"detail": "not found"}, status_code=404)
+    merchant = db.get(Merchant, doc.merchant_id)
+    if doc.doc_type == "RCP":
+        html = printing.render_receipt_html(doc, merchant, fmt=fmt)
+    else:
+        html = printing.render_invoice_html(doc, merchant, fmt=fmt)
+    return HTMLResponse(content=html)
 
 
 @app.get("/healthz", tags=["health"])

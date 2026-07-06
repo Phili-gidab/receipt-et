@@ -255,11 +255,21 @@ def build_invoice(
         else:
             line_amount = float(raw["unit_price"]) * quantity - discount
 
-        pre_tax, tax_amount, line_total = _split_amount(
-            line_amount, tax_code, vat_inclusive=vat_inclusive
-        )
-        # UnitPrice is the pre-tax value of a single unit.
-        unit_price = round(pre_tax / quantity, 2) if quantity else pre_tax
+        # Unit-price-first math (sandbox-observed rule): MoR recomputes every
+        # line as round2(UnitPrice * Quantity * (1+rate)) from the UnitPrice WE
+        # send and rejects any drift ("expected 80.01 received 80.0"). Derive a
+        # 4dp pre-tax UnitPrice from the charged amount, then compute PreTax/
+        # Tax/TotalLineAmount exactly the way MoR will, so the reconstruction
+        # always lands on the cashier's cent.
+        rate = _vat_rate(tax_code)
+        qty_div = quantity or 1.0
+        if rate and vat_inclusive:
+            unit_price = round(line_amount / qty_div / (1 + rate / 100.0), 4)
+        else:
+            unit_price = round(line_amount / qty_div, 4)
+        pre_tax = round(unit_price * quantity, 2)
+        line_total = round(unit_price * quantity * (1 + rate / 100.0), 2)
+        tax_amount = round(line_total - pre_tax, 2)
 
         item_list.append({
             "LineNumber": idx,

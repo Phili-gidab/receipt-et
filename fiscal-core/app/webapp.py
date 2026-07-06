@@ -153,10 +153,16 @@ def dashboard(request: Request, db: Session = Depends(get_session)):
         select(Document).where(Document.merchant_id == merchant.id)
         .order_by(Document.created_at.desc()).limit(8)
     ).scalars())
+    attention = list(db.execute(
+        select(Document).where(
+            Document.merchant_id == merchant.id,
+            Document.fiscal_status.in_([FiscalStatus.FAILED, FiscalStatus.PENDING]),
+        ).order_by(Document.created_at.desc()).limit(6)
+    ).scalars())
     return templates.TemplateResponse(request, "dashboard.html", _ctx(
         request, merchant,
         stat_count=len(today), stat_registered=len(registered), stat_total=total,
-        recent=recent,
+        recent=recent, attention=attention,
     ))
 
 
@@ -243,17 +249,56 @@ def _load_doc(request: Request, db: Session, doc_id: int):
     return merchant, doc
 
 
+def share_token(doc_id: int) -> str:
+    """Unguessable token for the public share link (HMAC over SESSION_SECRET)."""
+    import hashlib
+    import hmac as _hmac
+    secret = os.environ.get("SESSION_SECRET", "dev-only-change-me").encode()
+    return _hmac.new(secret, f"share:{doc_id}".encode(), hashlib.sha256).hexdigest()[:20]
+
+
+def _doc_by_irn(db: Session, merchant: Merchant, irn: str | None):
+    if not irn:
+        return None
+    return db.execute(
+        select(Document).where(Document.merchant_id == merchant.id, Document.irn == irn)
+    ).scalar_one_or_none()
+
+
 @router.get("/receipt/{doc_id}", response_class=HTMLResponse)
-def receipt_view(request: Request, doc_id: int, db: Session = Depends(get_session)):
+def receipt_view(request: Request, doc_id: int, ok: str = "", err: str = "",
+                 db: Session = Depends(get_session)):
     merchant, doc = _load_doc(request, db, doc_id)
     if merchant is None:
         return RedirectResponse(url="/app/login", status_code=303)
     if doc is None:
         return RedirectResponse(url="/app/receipts", status_code=303)
     payload = json.loads(doc.payload_json) if doc.payload_json else {}
+
+    # Cross-links: RCP -> invoice(s) it paid; CRE/DEB -> the original invoice;
+    # INV -> any notes/receipts that reference it.
+    related = None
+    if doc.doc_type == "RCP":
+        inv_rows = payload.get("Invoices") or []
+        related = _doc_by_irn(db, merchant, inv_rows[0].get("InvoiceIRN") if inv_rows else None)
+    elif doc.doc_type in ("CRE", "DEB"):
+        related = _doc_by_irn(db, merchant, (payload.get("ReferenceDetails") or {}).get("RelatedDocument"))
+    children = []
+    if doc.doc_type == "INV" and doc.irn:
+        like = f'%{doc.irn}%'
+        children = list(db.execute(
+            select(Document)
+            .where(Document.merchant_id == merchant.id, Document.id != doc.id,
+                   func.coalesce(Document.payload_json, "").like(like))
+            .order_by(Document.created_at.desc()).limit(10)
+        ).scalars())
+
     return templates.TemplateResponse(request, "receipt.html", _ctx(
         request, merchant, doc=doc, payload=payload,
         registered=(doc.fiscal_status == FiscalStatus.REGISTERED),
+        related=related, children=children,
+        share_url=f"/r/{doc.id}/{share_token(doc.id)}",
+        ok=ok or None, err=err or None,
     ))
 
 
@@ -262,8 +307,126 @@ def receipt_print(request: Request, doc_id: int, fmt: str = "thermal", db: Sessi
     merchant, doc = _load_doc(request, db, doc_id)
     if merchant is None or doc is None:
         return RedirectResponse(url="/app/receipts", status_code=303)
-    html = printing.render_invoice_html(doc, merchant, fmt=fmt)
+    if doc.doc_type == "RCP":
+        html = printing.render_receipt_html(doc, merchant, fmt=fmt)
+    else:
+        html = printing.render_invoice_html(doc, merchant, fmt=fmt)
     return HTMLResponse(content=html)
+
+
+def _back_to_doc(doc_id: int, *, ok: str = "", err: str = "") -> RedirectResponse:
+    from urllib.parse import quote
+    qs = f"?ok={quote(ok)}" if ok else (f"?err={quote(err)}" if err else "")
+    return RedirectResponse(url=f"/app/receipt/{doc_id}{qs}", status_code=303)
+
+
+@router.post("/receipt/{doc_id}/void")
+def receipt_void(request: Request, doc_id: int, reason_code: str = Form("3"),
+                 remark: str = Form(""), db: Session = Depends(get_session)):
+    merchant, doc = _load_doc(request, db, doc_id)
+    if merchant is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    if doc is None:
+        return RedirectResponse(url="/app/receipts", status_code=303)
+    if doc.doc_type not in ("INV", "CRE", "DEB") or not doc.irn:
+        return _back_to_doc(doc_id, err="Only registered invoices/notes can be voided.")
+    try:
+        registration.cancel_invoice_for_document(
+            db, merchant, doc.irn, reason_code=reason_code, remark=remark.strip(),
+        )
+        return _back_to_doc(doc_id, ok="Voided — cancellation registered with MoR.")
+    except Exception as exc:
+        return _back_to_doc(doc_id, err=f"Void failed: {str(exc)[:250]}")
+
+
+@router.post("/receipt/{doc_id}/refund")
+def receipt_refund(request: Request, doc_id: int, reason: str = Form(""),
+                   db: Session = Depends(get_session)):
+    merchant, doc = _load_doc(request, db, doc_id)
+    if merchant is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    if doc is None:
+        return RedirectResponse(url="/app/receipts", status_code=303)
+    if doc.doc_type != "INV" or doc.fiscal_status != FiscalStatus.REGISTERED or not doc.irn:
+        return _back_to_doc(doc_id, err="Refunds need a registered invoice.")
+    if not doc.amount:
+        return _back_to_doc(doc_id, err="Original amount unknown — cannot refund.")
+    note = {
+        # idempotent: refunding twice returns the same credit note
+        "transaction_ref": f"CRE-{doc.transaction_ref}",
+        "amount": float(doc.amount),
+        "currency": doc.currency or "ETB",
+        "payment_mode": "CASH",
+        "related_irn": doc.irn,
+        "reason": (reason.strip() or "Refund / return of goods")[:300],
+        "items": [{
+            "item_code": "REFUND",
+            "product_description": f"Refund — sale {doc.transaction_ref}"[:300],
+            "unit_price": float(doc.amount), "quantity": 1, "discount": 0.0,
+            "nature_of_supplies": "goods", "unit": "PCS",
+            "tax_code": merchant.tax_code or "VAT15",
+        }],
+    }
+    try:
+        cre = registration.issue_credit_note(db, merchant, note)
+    except Exception as exc:
+        return _back_to_doc(doc_id, err=f"Refund failed: {str(exc)[:250]}")
+    if cre.fiscal_status == FiscalStatus.REGISTERED:
+        return _back_to_doc(cre.id, ok="Refund registered with MoR (credit note).")
+    return _back_to_doc(cre.id, err=f"Credit note rejected: {(cre.error or '')[:250]}")
+
+
+# --------------------------------------------------------------------------- #
+# Z-report — day-close summary (Africa/Addis_Ababa day, UTC+3)
+# --------------------------------------------------------------------------- #
+@router.get("/zreport", response_class=HTMLResponse)
+def zreport(request: Request, date: str = "", db: Session = Depends(get_session)):
+    from datetime import timedelta
+
+    merchant = _current(request, db)
+    if merchant is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    addis = timezone(timedelta(hours=3))
+    try:
+        day = datetime.strptime(date, "%Y-%m-%d").date() if date else datetime.now(addis).date()
+    except ValueError:
+        day = datetime.now(addis).date()
+    start_local = datetime(day.year, day.month, day.day, tzinfo=addis)
+    start_utc = start_local.astimezone(timezone.utc)
+    end_utc = start_utc + timedelta(days=1)
+
+    docs = list(db.execute(
+        select(Document).where(
+            Document.merchant_id == merchant.id,
+            Document.created_at >= start_utc,
+            Document.created_at < end_utc,
+        ).order_by(Document.created_at.asc())
+    ).scalars())
+
+    def _vat_of(d: Document) -> float:
+        try:
+            return float((json.loads(d.payload_json or "{}").get("ValueDetails") or {}).get("TaxValue") or 0)
+        except Exception:
+            return 0.0
+
+    inv = [d for d in docs if d.doc_type == "INV" and d.fiscal_status == FiscalStatus.REGISTERED]
+    cre = [d for d in docs if d.doc_type == "CRE" and d.fiscal_status == FiscalStatus.REGISTERED]
+    gross = sum(float(d.amount or 0) for d in inv)
+    refunds = sum(float(d.amount or 0) for d in cre)
+    vat_out = sum(_vat_of(d) for d in inv) - sum(_vat_of(d) for d in cre)
+    voided = [d for d in docs if d.fiscal_status == FiscalStatus.CANCELLED]
+    failed = [d for d in docs if d.fiscal_status == FiscalStatus.FAILED]
+
+    return templates.TemplateResponse(request, "zreport.html", _ctx(
+        request, merchant,
+        day=day.strftime("%d %b %Y"), day_iso=day.isoformat(),
+        prev_day=(day - timedelta(days=1)).isoformat(),
+        next_day=(day + timedelta(days=1)).isoformat(),
+        docs=docs, inv_count=len(inv), gross=gross, refunds=refunds,
+        net=gross - refunds, vat_out=vat_out,
+        rcp_count=sum(1 for d in docs if d.doc_type == "RCP" and d.fiscal_status == FiscalStatus.REGISTERED),
+        voided_count=len(voided), failed_count=len(failed),
+    ))
 
 
 @router.get("/receipts", response_class=HTMLResponse)
