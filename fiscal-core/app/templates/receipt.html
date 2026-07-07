@@ -1,20 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Receipt {{ doc.document_number or doc.id }}{% endblock %}
 {% block content %}
-<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
-  <p class="kicker" style="margin:0">{% if doc.doc_type == 'RCP' %}Payment receipt{% elif doc.doc_type == 'CRE' %}Credit note{% elif doc.doc_type == 'DEB' %}Debit note{% else %}Fiscal invoice{% endif %}</p>
-  {% if registered %}<span class="pill ok">✓ Registered with MoR</span>
-  {% elif doc.fiscal_status.value == 'Failed' %}<span class="pill bad">Failed</span>
-  {% elif doc.fiscal_status.value == 'Cancelled' %}<span class="pill warn">Voided</span>
-  {% else %}<span class="pill warn">{{ doc.fiscal_status.value }}</span>{% endif %}
-  <span style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap">
+<div class="page-head" style="margin-bottom:16px">
+  <span style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <p class="kicker" style="margin:0">{% if doc.doc_type == 'RCP' %}Payment receipt{% elif doc.doc_type == 'CRE' %}Credit note{% elif doc.doc_type == 'DEB' %}Debit note{% else %}Fiscal invoice{% endif %}</p>
+    {% if registered %}<span class="pill ok">✓ Registered with MoR</span>
+    {% elif doc.fiscal_status.value == 'Failed' %}<span class="pill bad">Failed</span>
+    {% elif doc.fiscal_status.value == 'Cancelled' %}<span class="pill warn">Voided</span>
+    {% else %}<span class="pill warn">{{ doc.fiscal_status.value }}</span>{% endif %}
+  </span>
+  <span class="head-actions">
     <a class="btn btn-ghost btn-sm" href="/app/receipt/{{ doc.id }}/print?fmt=thermal" target="_blank">⎙ Thermal</a>
     <a class="btn btn-ghost btn-sm" href="/app/receipt/{{ doc.id }}/print?fmt=a4" target="_blank">⎙ A4 / PDF</a>
     {% if registered %}
     <button class="btn btn-ghost btn-sm" type="button" id="shareBtn"
             onclick="navigator.clipboard.writeText(location.origin + '{{ share_url }}').then(()=>{this.textContent='✓ Link copied'});">⇪ Share link</button>
-    <form method="post" action="/app/receipt/{{ doc.id }}/verify" style="display:inline">
-      <button class="btn btn-ghost btn-sm" type="submit">⚖ Verify at MoR</button>
+    <form method="post" action="/app/receipt/{{ doc.id }}/verify">
+      <button class="btn btn-ghost btn-sm" type="submit" style="width:100%">⚖ Verify at MoR</button>
     </form>
     {% endif %}
     <a class="btn btn-solid btn-sm" href="/app/pos">+ New sale</a>
@@ -24,7 +26,7 @@
 {% if ok %}<div class="card" style="border-color:var(--accent);color:var(--accent);margin-bottom:14px">✓ {{ ok }}</div>{% endif %}
 {% if err %}<div class="err" style="margin-bottom:14px">{{ err }}</div>{% endif %}
 
-<div style="display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:28px" id="rGrid">
+<div class="receipt-grid">
   <!-- paper document -->
   <div style="background:var(--paper);color:var(--paper-ink);padding:26px 24px;box-shadow:0 18px 40px rgba(0,0,0,.5)">
     <div style="text-align:center;color:var(--accent-2);font-size:20px">🧾</div>
@@ -122,7 +124,7 @@
       <hr class="dash" style="margin:14px 0"/>
       <form method="post" action="/app/receipt/{{ doc.id }}/void"
             onsubmit="return confirm('Void this invoice at MoR? This cannot be undone.')">
-        <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-bottom:10px">
+        <div class="void-grid">
           <div class="field" style="margin:0">
             <label>Reason</label>
             <select name="reason_code">
@@ -156,5 +158,8 @@
     {% endif %}
   </div>
 </div>
-<script>if (matchMedia('(max-width: 760px)').matches) document.getElementById('rGrid').style.gridTemplateColumns='1fr';</script>
+<style>
+  .void-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-bottom:10px}
+  @media(max-width:480px){.void-grid{grid-template-columns:1fr}}
+</style>
 {% endblock %}

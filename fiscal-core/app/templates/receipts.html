@@ -2,40 +2,50 @@
 {% block title %}Receipts{% endblock %}
 {% block nav_receipts %}active{% endblock %}
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+<div class="page-head" style="margin-bottom:16px">
   <div>
     <p class="kicker">History</p>
     <h1 style="font-size:26px">Receipts</h1>
   </div>
-  <form method="get" action="/app/receipts" style="margin-left:auto;display:flex;gap:8px">
+  <form method="get" action="/app/receipts" class="search-form">
     <input name="q" value="{{ q }}" placeholder="Search IRN or ref…"
-           style="background:var(--bg-2);border:1px solid var(--line);color:var(--ink);font:inherit;padding:10px 12px;min-width:220px"/>
+           style="background:var(--bg-2);border:1px solid var(--line);color:var(--ink);font:inherit;padding:10px 12px"/>
     <button class="btn btn-ghost btn-sm" type="submit">Search</button>
   </form>
 </div>
+<style>
+  .search-form{margin-left:auto;display:flex;gap:8px}
+  .search-form input{min-width:220px}
+  @media(max-width:719px){
+    .search-form{margin:14px 0 0}
+    .search-form input{min-width:0;flex:1;font-size:16px}
+  }
+</style>
 
 {% if docs %}
-<table>
+<div class="table-wrap">
+<table class="rtable">
   <thead><tr><th>Date</th><th>Ref</th><th>Type</th><th>Amount</th><th>Status</th><th>IRN / RRN</th><th></th></tr></thead>
   <tbody>
   {% for d in docs %}
     <tr>
-      <td class="muted" style="font-size:12px">{{ d.created_at.strftime('%d/%m %H:%M') if d.created_at else '' }}</td>
-      <td>{{ d.transaction_ref }}</td>
-      <td>{{ d.doc_type }}</td>
-      <td>ETB {{ '%.2f'|format(d.amount or 0) }}</td>
-      <td>
+      <td data-label="Date" class="muted" style="font-size:12px">{{ d.created_at.strftime('%d/%m %H:%M') if d.created_at else '' }}</td>
+      <td data-label="Ref" style="overflow-wrap:anywhere">{{ d.transaction_ref }}</td>
+      <td data-label="Type">{{ d.doc_type }}</td>
+      <td data-label="Amount">ETB {{ '%.2f'|format(d.amount or 0) }}</td>
+      <td data-label="Status">
         {% if d.fiscal_status.value == 'Registered' %}<span class="pill ok">Registered</span>
         {% elif d.fiscal_status.value == 'Failed' %}<span class="pill bad">Failed</span>
         {% elif d.fiscal_status.value == 'Cancelled' %}<span class="pill warn">Cancelled</span>
         {% else %}<span class="pill warn">{{ d.fiscal_status.value }}</span>{% endif %}
       </td>
-      <td class="muted" style="font-size:11px;word-break:break-all">{{ (d.irn or d.rrn or '—')[:28] }}</td>
-      <td><a class="muted" href="/app/receipt/{{ d.id }}">open →</a></td>
+      <td data-label="IRN / RRN" class="muted" style="font-size:11px;word-break:break-all">{{ (d.irn or d.rrn or '—')[:28] }}</td>
+      <td class="rt-open"><a class="accent" href="/app/receipt/{{ d.id }}">open →</a></td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}
 <p class="muted">Nothing here yet{% if q %} for “{{ q }}”{% endif %}. <a class="accent" href="/app/pos">Make a sale →</a></p>
 {% endif %}

@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Z-Report {{ day }}{% endblock %}
 {% block content %}
-<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px">
+<div class="page-head">
   <div>
     <p class="kicker">Day close</p>
-    <h1 style="font-size:26px">Z-Report — {{ day }}</h1>
+    <h1 style="font-size:clamp(20px,5vw,26px)">Z-Report — {{ day }}</h1>
     <p class="muted" style="font-size:13px">{{ m.legal_name }} · TIN {{ m.tin }} · Africa/Addis_Ababa day</p>
   </div>
-  <span style="margin-left:auto;display:flex;gap:10px;align-items:center">
+  <span class="head-actions three">
     <a class="btn btn-ghost btn-sm" href="/app/zreport?date={{ prev_day }}">← Prev</a>
     <a class="btn btn-ghost btn-sm" href="/app/zreport?date={{ next_day }}">Next →</a>
     <button class="btn btn-solid btn-sm" onclick="window.print()">⎙ Print</button>
@@ -39,26 +39,28 @@
 
 <h3 style="font-size:15px;margin-bottom:12px">All documents — {{ day }}</h3>
 {% if docs %}
-<table>
+<div class="table-wrap">
+<table class="rtable">
   <thead><tr><th>Time</th><th>Ref</th><th>Type</th><th>Amount</th><th>Status</th><th></th></tr></thead>
   <tbody>
   {% for d in docs %}
     <tr>
-      <td class="muted" style="font-size:12px">{{ d.created_at.strftime('%H:%M') if d.created_at else '' }}</td>
-      <td style="font-size:12.5px">{{ d.transaction_ref }}</td>
-      <td>{{ d.doc_type }}</td>
-      <td>ETB {{ '%.2f'|format(d.amount or 0) }}</td>
-      <td>
+      <td data-label="Time" class="muted" style="font-size:12px">{{ d.created_at.strftime('%H:%M') if d.created_at else '' }}</td>
+      <td data-label="Ref" style="font-size:12.5px;overflow-wrap:anywhere">{{ d.transaction_ref }}</td>
+      <td data-label="Type">{{ d.doc_type }}</td>
+      <td data-label="Amount">ETB {{ '%.2f'|format(d.amount or 0) }}</td>
+      <td data-label="Status">
         {% if d.fiscal_status.value == 'Registered' %}<span class="pill ok">Registered</span>
         {% elif d.fiscal_status.value == 'Failed' %}<span class="pill bad">Failed</span>
         {% elif d.fiscal_status.value == 'Cancelled' %}<span class="pill warn">Voided</span>
         {% else %}<span class="pill warn">{{ d.fiscal_status.value }}</span>{% endif %}
       </td>
-      <td><a class="muted" href="/app/receipt/{{ d.id }}">open →</a></td>
+      <td class="rt-open"><a class="accent" href="/app/receipt/{{ d.id }}">open →</a></td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}
 <p class="muted">No documents on this day.</p>
 {% endif %}

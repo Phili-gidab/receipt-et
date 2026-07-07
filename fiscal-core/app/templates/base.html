@@ -31,6 +31,7 @@
       --red:#c4353f;
     }
     *{margin:0;padding:0;box-sizing:border-box}
+    html{overflow-x:clip}
     body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:15px;line-height:1.6}
     a{color:inherit}
     h1,h2,h3,.display{font-family:'Archivo','Arial Black',sans-serif;font-weight:900;text-transform:uppercase;letter-spacing:.5px;line-height:1.05}
@@ -79,7 +80,54 @@
     th{color:var(--muted);font-size:11px;letter-spacing:1.2px;text-transform:uppercase;font-weight:600}
     .dash{border:0;border-top:2px dashed var(--line);margin:26px 0}
     main{padding:34px 0 70px}
-    @media(max-width:640px){.nav a{padding:7px 8px}.container{padding:0 16px}}
+    /* page header: title left, actions right; stacks on mobile */
+    .page-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:8px}
+    .head-actions{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    /* layout grids (CSS-only — no JS viewport hacks) */
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+    .pos-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:26px}
+    .receipt-grid{display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:28px}
+    .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .tabbar{display:none}
+    @media(max-width:860px){.grid-2{grid-template-columns:1fr}}
+    @media(max-width:760px){.pos-grid,.receipt-grid{grid-template-columns:1fr}}
+    @media(max-width:719px){
+      .container{padding:0 16px}
+      main{padding:24px 0 70px}
+      main.with-tabbar{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+      /* topbar keeps brand + theme + logout; page links move to the bottom tab bar */
+      .nav{gap:2px}
+      .nav .nav-page{display:none}
+      .nav a,.theme-btn{padding:10px 8px}
+      .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;
+        background:color-mix(in srgb,var(--bg) 94%,transparent);backdrop-filter:blur(10px);
+        border-top:2px dashed var(--line);padding-bottom:env(safe-area-inset-bottom)}
+      .tabbar .tab{flex:1;display:flex;align-items:center;justify-content:center;height:52px;
+        text-decoration:none;font-size:10.5px;font-weight:700;
+        letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);
+        border-top:2px solid transparent;margin-top:-2px}
+      .tabbar .tab.active{color:var(--accent);border-top-color:var(--accent)}
+      .tabbar .tab-sell{color:var(--accent)}
+      /* header actions become an even button row */
+      .page-head{display:block}
+      .head-actions{margin:14px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+      .head-actions.three{grid-template-columns:1fr 1fr 1fr}
+      .head-actions .btn{text-align:center;padding:12px 8px}
+      .head-actions form{display:contents}
+      /* 16px inputs stop iOS from zooming the page on focus */
+      .field input,.field select,textarea,select{font-size:16px}
+      .lead-row{flex-wrap:wrap}
+      .lead-row .fill{min-width:24px}
+      /* tables collapse into receipt-style cards */
+      table.rtable thead{display:none}
+      table.rtable,table.rtable tbody,table.rtable tr,table.rtable td{display:block}
+      table.rtable tr{border:1px dashed var(--line);padding:10px 14px;margin-bottom:10px}
+      table.rtable td{border:0;padding:4px 0;display:flex;justify-content:space-between;align-items:baseline;gap:14px;font-size:13px}
+      table.rtable td[data-label]::before{content:attr(data-label);color:var(--muted);font-size:10px;letter-spacing:1.2px;text-transform:uppercase;flex-shrink:0}
+      table.rtable td.rt-open{justify-content:flex-end;padding-top:8px}
+      table.rtable td:empty{display:none}
+    }
+    @media print{.topbar,.tabbar,.pos-chargebar{display:none!important}main{padding:0}}
   </style>
 </head>
 <body>
@@ -90,10 +138,10 @@
       </a>
       <nav class="nav">
         {% if m %}
-        <a href="/app" class="{% block nav_home %}{% endblock %}">Dashboard</a>
-        <a href="/app/pos" class="{% block nav_pos %}{% endblock %}">Sell</a>
-        <a href="/app/receipts" class="{% block nav_receipts %}{% endblock %}">Receipts</a>
-        <a href="/app/settings" class="{% block nav_settings %}{% endblock %}">Settings</a>
+        <a href="/app" class="nav-page {% block nav_home %}{% endblock %}">Dashboard</a>
+        <a href="/app/pos" class="nav-page {% block nav_pos %}{% endblock %}">Sell</a>
+        <a href="/app/receipts" class="nav-page {% block nav_receipts %}{% endblock %}">Receipts</a>
+        <a href="/app/settings" class="nav-page {% block nav_settings %}{% endblock %}">Settings</a>
         {% endif %}
         <button id="themeBtn" type="button" class="theme-btn" onclick="__toggleTheme()">◐ DARK</button>
         {% if m %}<a href="/app/logout">Logout</a>{% endif %}
@@ -112,6 +160,14 @@
       </script>
     </div>
   </header>
-  <main><div class="container">{% block content %}{% endblock %}</div></main>
+  <main class="{% if m %}with-tabbar{% endif %}"><div class="container">{% block content %}{% endblock %}</div></main>
+  {% if m %}
+  <nav class="tabbar">
+    <a href="/app" class="tab {{ self.nav_home() }}">Home</a>
+    <a href="/app/pos" class="tab tab-sell {{ self.nav_pos() }}">+ Sell</a>
+    <a href="/app/receipts" class="tab {{ self.nav_receipts() }}">Receipts</a>
+    <a href="/app/settings" class="tab {{ self.nav_settings() }}">Settings</a>
+  </nav>
+  {% endif %}
 </body>
 </html>

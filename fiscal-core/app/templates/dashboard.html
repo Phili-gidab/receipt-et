@@ -2,13 +2,13 @@
 {% block title %}Dashboard{% endblock %}
 {% block nav_home %}active{% endblock %}
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:8px">
+<div class="page-head">
   <div>
     <p class="kicker">Dashboard</p>
-    <h1 style="font-size:28px">{{ m.legal_name }}</h1>
+    <h1 style="font-size:clamp(21px,5.5vw,28px);overflow-wrap:anywhere">{{ m.legal_name }}</h1>
     <p class="muted" style="font-size:13px">TIN {{ m.tin }} · {{ m.system_type or 'POS' }} · {{ m.tax_code or 'VAT15' }}</p>
   </div>
-  <span style="margin-left:auto;display:flex;gap:10px">
+  <span class="head-actions">
     <a class="btn btn-ghost" href="/app/zreport">Z-Report</a>
     <a class="btn btn-solid" href="/app/pos">+ New Sale</a>
   </span>
@@ -21,10 +21,10 @@
   <p class="kicker" style="color:var(--amber)">Needs attention</p>
   {% for d in attention %}
   <div class="lead-row">
-    <span style="font-size:13px">{{ d.transaction_ref }} · {{ d.doc_type }} · ETB {{ '%.2f'|format(d.amount or 0) }}</span>
+    <span style="font-size:13px;overflow-wrap:anywhere">{{ d.transaction_ref }} · {{ d.doc_type }} · ETB {{ '%.2f'|format(d.amount or 0) }}</span>
     <span class="fill"></span>
     <span class="pill {{ 'bad' if d.fiscal_status.value == 'Failed' else 'warn' }}">{{ d.fiscal_status.value }}</span>
-    <a class="accent" style="font-size:12px;margin-left:10px" href="/app/receipt/{{ d.id }}">open →</a>
+    <a class="accent" style="font-size:12px;margin-left:10px;padding:4px 0" href="/app/receipt/{{ d.id }}">open →</a>
   </div>
   {% endfor %}
   <p class="muted" style="font-size:11.5px;margin-top:8px">Failed sales were not registered — open one to see the MoR error, then ring the sale again.</p>
@@ -47,25 +47,27 @@
   <a class="muted" style="margin-left:auto;font-size:12px" href="/app/receipts">View all →</a>
 </div>
 {% if recent %}
-<table>
+<div class="table-wrap">
+<table class="rtable">
   <thead><tr><th>Ref</th><th>Type</th><th>Amount</th><th>Status</th><th>IRN / RRN</th><th></th></tr></thead>
   <tbody>
   {% for d in recent %}
     <tr>
-      <td>{{ d.transaction_ref }}</td>
-      <td>{{ d.doc_type }}</td>
-      <td>ETB {{ '%.2f'|format(d.amount or 0) }}</td>
-      <td>
+      <td data-label="Ref" style="overflow-wrap:anywhere">{{ d.transaction_ref }}</td>
+      <td data-label="Type">{{ d.doc_type }}</td>
+      <td data-label="Amount">ETB {{ '%.2f'|format(d.amount or 0) }}</td>
+      <td data-label="Status">
         {% if d.fiscal_status.value == 'Registered' %}<span class="pill ok">Registered</span>
         {% elif d.fiscal_status.value == 'Failed' %}<span class="pill bad">Failed</span>
         {% else %}<span class="pill warn">{{ d.fiscal_status.value }}</span>{% endif %}
       </td>
-      <td class="muted" style="font-size:11px;word-break:break-all">{{ (d.irn or d.rrn or '—')[:24] }}</td>
-      <td><a class="muted" href="/app/receipt/{{ d.id }}">open →</a></td>
+      <td data-label="IRN / RRN" class="muted" style="font-size:11px;word-break:break-all">{{ (d.irn or d.rrn or '—')[:24] }}</td>
+      <td class="rt-open"><a class="accent" href="/app/receipt/{{ d.id }}">open →</a></td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}
 <p class="muted">No sales yet. <a class="accent" href="/app/pos">Ring up your first sale →</a></p>
 {% endif %}
