@@ -322,17 +322,32 @@ def receipt_verify(request: Request, doc_id: int, db: Session = Depends(get_sess
         return RedirectResponse(url="/app/login", status_code=303)
     if doc is None:
         return RedirectResponse(url="/app/receipts", status_code=303)
-    if not doc.irn:
-        return _back_to_doc(doc_id, err="No IRN on this document — nothing to verify.")
+    # Payment receipts carry an RRN, not an IRN — MoR's verify endpoint works
+    # on invoices/notes, so for an RCP we verify the invoice it pays.
+    irn, via = doc.irn, ""
+    if doc.doc_type == "RCP":
+        try:
+            inv_rows = (json.loads(doc.payload_json or "{}").get("Invoices")) or []
+        except Exception:
+            inv_rows = []
+        irn = inv_rows[0].get("InvoiceIRN") if inv_rows else None
+        via = "the invoice this receipt pays: "
+        if not irn:
+            return _back_to_doc(doc_id, err=(
+                "This payment receipt has MoR's RRN and QR (issued at registration). "
+                "MoR verifies by invoice IRN — open the linked invoice to run verify."
+            ))
+    if not irn:
+        return _back_to_doc(doc_id, err="This document has no IRN to verify — it was never registered.")
     try:
-        res = registration.verify_invoice_for_document(db, merchant, doc.irn)
+        res = registration.verify_invoice_for_document(db, merchant, irn)
     except Exception as exc:
         return _back_to_doc(doc_id, err=f"Verify failed: {str(exc)[:250]}")
     if res.get("ok"):
         body = (res.get("mor") or {}).get("body") or {}
         dd = body.get("DocumentDetails") or {}
         return _back_to_doc(doc_id, ok=(
-            f"MoR confirms this document: {dd.get('Type', doc.doc_type)} "
+            f"MoR confirms {via}{dd.get('Type', doc.doc_type)} "
             f"#{dd.get('DocumentNumber', doc.document_number)} · {body.get('TransactionType', '')} "
             f"· registered {dd.get('Date', '')} — straight from MoR's database."
         ))
