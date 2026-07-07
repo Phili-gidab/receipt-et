@@ -208,7 +208,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
   .howflow-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 34px;
     scrollbar-width: none; }
   .howflow-wrap::-webkit-scrollbar { display: none; }
-  .howflow { min-width: 780px; }
+  .howflow { min-width: 900px; }
   .hf-cards { grid-template-columns: 1fr; gap: 12px; }
   .hf-card { padding: 20px 18px; }
 }

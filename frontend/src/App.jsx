@@ -76,7 +76,18 @@ export default function App() {
     const raf = (t) => lenis.raf(t * 1000);
     gsap.ticker.add(raf);
     gsap.ticker.lagSmoothing(0);
+    // route in-page anchors through Lenis so nav clicks glide instead of jumping
+    const onAnchor = (e) => {
+      const a = e.target.closest?.('a[href^="#"]');
+      if (!a) return;
+      const el = document.querySelector(a.getAttribute("href"));
+      if (!el) return;
+      e.preventDefault();
+      lenis.scrollTo(el, { offset: -70, duration: 1.15 });
+    };
+    document.addEventListener("click", onAnchor);
     return () => {
+      document.removeEventListener("click", onAnchor);
       gsap.ticker.remove(raf);
       lenis.destroy();
     };
