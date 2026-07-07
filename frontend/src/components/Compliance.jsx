@@ -3,10 +3,10 @@ import { RECEIPT } from "../data/receipt.js";
 import PrintReveal from "./PrintReveal.jsx";
 
 const cards = [
-  { stamp: "Directive 188", t: "A valid QR on every receipt", d: "Every tax invoice must carry a unique, tax-authority-validated QR code. Receipt prints one on every sale — no separate fiscal machine to babysit." },
+  { stamp: "Directive 188", t: "A valid QR on every receipt", d: "Every tax invoice must carry a unique, tax-authority-validated QR code. Receipt prints one on every sale, with no separate fiscal machine to babysit." },
   { stamp: "Verified", t: "Verifiable by anyone", d: "Buyers can scan and confirm a receipt's authenticity through the Ministry of Revenue's verification service. Real receipts, real records." },
-  { stamp: "No penalties", t: "Avoid “illegal receipt” fines", d: "The MoR is phasing out manual paper receipts — non-QR receipts can be rejected for VAT deduction. Receipt keeps every sale on the right side of the rules." },
-  { stamp: "VAT 15%", t: "Correct tax, every time", d: "Ethiopia's 15% VAT computed on every line, sequence-chained and signed — captured on the invoice and ready for reporting." },
+  { stamp: "No penalties", t: "Avoid “illegal receipt” fines", d: "The MoR is phasing out manual paper receipts; non-QR receipts can be rejected for VAT deduction. Receipt keeps every sale on the right side of the rules." },
+  { stamp: "VAT 15%", t: "Correct tax, every time", d: "Ethiopia's 15% VAT computed on every line, sequence-chained and signed, captured on the invoice and ready for reporting." },
 ];
 
 export default function Compliance() {
@@ -18,7 +18,7 @@ export default function Compliance() {
         <p style={{ textAlign: "center", color: "var(--muted)", maxWidth: 620, margin: "0 auto 50px" }}>
           Ethiopia is moving from paper receipts to tax-validated, QR-coded invoices.
           Receipt keeps you compliant with the Ministry of Revenue's electronic
-          invoicing — without changing how you sell.
+          invoicing, without changing how you sell.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: "26px 20px" }}>
           {cards.map((c, i) => (

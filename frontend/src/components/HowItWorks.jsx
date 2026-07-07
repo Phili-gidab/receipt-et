@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import PrintReveal from "./PrintReveal.jsx";
+import { tick, kachunk } from "../lib/sound.js";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -16,9 +17,9 @@ gsap.registerPlugin(ScrollTrigger);
  */
 
 const steps = [
-  { n: "01", t: "Sell", d: "Ring up the sale on the web POS — phone, tablet or desktop. Amharic-friendly, keyboard-fast, cashier-simple." },
+  { n: "01", t: "Sell", d: "Ring up the sale on the web POS: phone, tablet or desktop. Amharic-friendly, keyboard-fast, cashier-simple." },
   { n: "02", t: "Sign", d: "Each invoice is canonically serialized and signed SHA512-RSA with an INSA-issued digital certificate. Keys never leave the server." },
-  { n: "03", t: "Register", d: "Sent to MoR EIMS in real time. Sequence-chained per business — no invoice can be skipped, duplicated or forged." },
+  { n: "03", t: "Register", d: "Sent to MoR EIMS in real time. Sequence-chained per business, so no invoice can be skipped, duplicated or forged." },
   { n: "04", t: "Verify", d: "MoR returns the IRN and a government-signed QR. Print thermal or A4; anyone can scan and verify the sale instantly." },
 ];
 
@@ -140,9 +141,26 @@ function buildTimeline(q) {
 /* timeline seconds → active card index */
 const stepAt = (t) => (t < 2.9 ? 0 : t < 6.8 ? 1 : t < 11.2 ? 2 : 3);
 
+/* dot-matrix chatter windows: [start, end, cadence, volume] */
+const CHATTER = [[0.2, 1.25, 0.12, 0.35], [4.3, 5.5, 0.15, 0.4], [12.35, 13.6, 0.12, 0.4]];
+const TRAVEL = [[2.2, 3.6], [6.2, 7.4], [10.6, 11.8]];
+
 export default function HowItWorks() {
   const root = useRef(null);
   const [active, setActive] = useState(-1);
+  const snd = useRef({ prev: 0, last: -1 });
+
+  /* opt-in sounds keyed to timeline beats (no-ops while sound is off) */
+  const soundStep = (t) => {
+    const s = snd.current;
+    if (t >= 14.2 && s.prev < 14.2) kachunk();          /* the stamp */
+    if (t >= 9.62 && s.prev < 9.62) tick(0.9);          /* counter flips */
+    let cad = 0, vol = 0.5;
+    for (const [a, b, c, v] of CHATTER) if (t >= a && t <= b) { cad = c; vol = v; }
+    if (!cad) for (const [a, b] of TRAVEL) if (t >= a && t <= b) { cad = 0.3; vol = 0.45; }
+    if (cad && Math.abs(t - s.last) >= cad) { tick(vol); s.last = t; }
+    s.prev = t;
+  };
 
   useLayoutEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -156,7 +174,7 @@ export default function HowItWorks() {
       /* Desktop: pin the section, scroll drives the journey. */
       mm.add("(min-width: 881px)", () => {
         const tl = buildTimeline(q);
-        tl.eventCallback("onUpdate", () => setActive(stepAt(tl.time())));
+        tl.eventCallback("onUpdate", () => { const t = tl.time(); setActive(stepAt(t)); soundStep(t); });
         ScrollTrigger.create({
           animation: tl,
           trigger: root.current,
@@ -178,6 +196,7 @@ export default function HowItWorks() {
         tl.repeat(-1).repeatDelay(1.6).pause();
         tl.eventCallback("onUpdate", () => {
           setActive(stepAt(tl.time()));
+          soundStep(tl.time());
           if (wrap) {
             const max = wrap.scrollWidth - wrap.clientWidth;
             /* hold on station 1 until the chit departs (t≈2.2), then follow it */

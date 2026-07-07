@@ -38,7 +38,7 @@ function TearStrip() {
         >
           <span className="stamp" style={{ right: 16, top: 12 }}>Founding merchant</span>
           <div className="mono" style={{ fontSize: 10.5, letterSpacing: ".2em", color: "var(--paper-muted)" }}>
-            YOU KEPT THE STUB — IT'S WORTH SOMETHING
+            YOU KEPT THE STUB · IT'S WORTH SOMETHING
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", margin: "12px 0 8px" }}>
             <span className="mono" style={{ fontWeight: 700, fontSize: "clamp(22px,4vw,30px)", letterSpacing: ".08em" }}>{CODE}</span>
@@ -91,7 +91,7 @@ export default function Footer() {
               Ready to sell<br /><span style={{ color: "#39d98a" }}>compliantly?</span>
             </PrintReveal>
             <p style={{ textAlign: "center", color: "#9aa79d", maxWidth: 520, margin: "0 auto 28px", fontSize: 15.5 }}>
-              Join the pilot — we set you up, register your certificate, and your first
+              Join the pilot: we set you up, register your certificate, and your first
               government-verified receipt prints the same week.
             </p>
             <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
@@ -111,7 +111,7 @@ export default function Footer() {
               <div style={{ fontWeight: 900, fontSize: 20 }}>Receipt<span style={{ color: "var(--green)" }}>.</span></div>
               <p className="mono" style={{ fontSize: 12, color: "var(--muted)", marginTop: 10, lineHeight: 1.8, maxWidth: 280 }}>
                 Point of sale for Ethiopian businesses. Compliant fiscal receipts on
-                every sale — online or offline.
+                every sale, online or offline.
               </p>
             </div>
             {Object.entries(cols).map(([h, links]) => (

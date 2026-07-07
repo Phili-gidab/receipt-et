@@ -11,7 +11,7 @@ const items = [
 export default function Marquee() {
   const row = [...items, ...items];
   return (
-    <div style={{ borderTop: "1px dashed var(--line)", borderBottom: "1px dashed var(--line)", overflow: "hidden", padding: "13px 0", background: "var(--bg-2)" }}>
+    <div className="marquee-smear" style={{ borderTop: "1px dashed var(--line)", borderBottom: "1px dashed var(--line)", overflow: "hidden", padding: "13px 0", background: "var(--bg-2)" }}>
       <div className="mono marquee-track" style={{ display: "flex", gap: 44, whiteSpace: "nowrap", fontSize: 12, letterSpacing: ".16em", color: "var(--muted)", animation: "scrollX 36s linear infinite", width: "max-content" }}>
         {row.map((t, i) => (
           <span key={i}>

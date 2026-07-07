@@ -4,15 +4,15 @@ import PrintReveal from "./PrintReveal.jsx";
 
 const faqs = [
   ["Is this legal / approved by the Ministry of Revenue?",
-   "Receipt integrates directly with MoR's EIMS platform and follows the e-invoicing directive: INSA-signed payloads, sequence-chained invoices, government-issued IRN and QR on every receipt. Certification evidence is being assembled with MoR now — the demo receipt on this page was registered in MoR's own sandbox."],
+   "Receipt integrates directly with MoR's EIMS platform and follows the e-invoicing directive: INSA-signed payloads, sequence-chained invoices, government-issued IRN and QR on every receipt. Certification evidence is being assembled with MoR now; the demo receipt on this page was registered in MoR's own sandbox."],
   ["Do I need special hardware?",
    "No. Receipt runs in a browser on any phone, tablet or computer, and prints to the thermal or A4 printer you already own."],
   ["What happens when the internet goes down?",
-   "Sales continue. They queue locally and register with MoR automatically when the connection returns — with the sequence chain kept intact. (Offline PWA mode is in active development.)"],
+   "Sales continue. They queue locally and register with MoR automatically when the connection returns, with the sequence chain kept intact. (Offline PWA mode is in active development.)"],
   ["Can it talk to my existing software?",
-   "Yes — the same fiscal engine is exposed as a clean REST API with OpenAPI docs, so ERPs, e-commerce stores and custom apps can register invoices through Receipt."],
+   "Yes. The same fiscal engine is exposed as a clean REST API with OpenAPI docs, so ERPs, e-commerce stores and custom apps can register invoices through Receipt."],
   ["What does it cost?",
-   "Simple monthly per-business pricing — no hardware, no per-receipt fees. Early pilot businesses get onboarding help and preferential terms; talk to us."],
+   "Simple monthly per-business pricing with no hardware and no per-receipt fees. Early pilot businesses get onboarding help and preferential terms; talk to us."],
 ];
 
 export default function FAQ() {

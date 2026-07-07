@@ -144,8 +144,8 @@ export default function Hero() {
           </div>
           <p style={{ maxWidth: 520, color: "var(--muted)", fontSize: 17.5, marginBottom: 30 }}>
             Receipt is a cloud POS for Ethiopian businesses. Issue receipts with the
-            QR code and invoice details required by the Ministry of Revenue — online
-            or offline — and stay penalty-free.
+            QR code and invoice details required by the Ministry of Revenue, online
+            or offline, and stay penalty-free.
           </p>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 28 }}>
             <a className="btn btn-solid" href={`${APP}/signup`}>Get started free</a>
@@ -206,7 +206,7 @@ export default function Hero() {
           </div>
 
           <div className="mono" style={{ textAlign: "center", marginTop: 14, fontSize: 10.5, letterSpacing: ".16em", color: "var(--muted)", ...nowrap }}>
-            ↓ SCROLL — THE PRINTER IS FEEDING
+            ↓ SCROLL · THE PRINTER IS FEEDING
           </div>
         </div>
       </div>

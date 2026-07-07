@@ -16,9 +16,9 @@ function Counter({ to, suffix = "", decimals = 0 }) {
 
 const stats = [
   { big: <Counter to={2} suffix="s" />, label: "from sale to government-registered receipt" },
-  { big: <Counter to={100} suffix="%" />, label: "MoR-compliant — VAT math, sequence chain, signed QR" },
+  { big: <Counter to={100} suffix="%" />, label: "MoR-compliant: VAT math, sequence chain, signed QR" },
   { big: <Counter to={39} />, label: "fiscal documents already chained in the MoR sandbox" },
-  { big: <Counter to={0} />, label: "hardware to buy — works with the printer you have" },
+  { big: <Counter to={0} />, label: "hardware to buy: works with the printer you have" },
 ];
 
 export default function Stats() {

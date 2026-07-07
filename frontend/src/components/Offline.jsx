@@ -5,7 +5,7 @@ const checks = [
   "Issue receipts with zero connectivity",
   "Contingency copy customers can keep",
   "Automatic, in-order sync when online",
-  "Sequence chain kept intact — nothing skipped",
+  "Sequence chain kept intact, nothing skipped",
 ];
 
 export default function Offline() {
@@ -30,7 +30,7 @@ export default function Offline() {
             </div>
           </div>
           <div className="mono" style={{ border: "1.5px dashed var(--amber)", color: "var(--amber)", fontSize: 12.5, padding: "12px 14px", lineHeight: 1.7 }}>
-            Sale saved with a contingency copy — nothing lost, registered with the
+            Sale saved with a contingency copy: nothing lost, registered with the
             Ministry of Revenue the moment you're back online.
           </div>
         </motion.div>
@@ -40,7 +40,7 @@ export default function Offline() {
           <PrintReveal className="h2" style={{ margin: "0 0 14px" }}>Never miss a sale<br />when the <em>network drops.</em></PrintReveal>
           <p style={{ color: "var(--muted)", fontSize: 16.5, maxWidth: 520, marginBottom: 22 }}>
             Power cuts and dead zones are a fact of business in Ethiopia. Receipt keeps
-            selling — every sale is issued, saved and queued on the device, then
+            selling: every sale is issued, saved and queued on the device, then
             registered with the Ministry of Revenue automatically once you're back
             online. Your customer walks away with a receipt either way.
           </p>

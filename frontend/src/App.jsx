@@ -15,28 +15,53 @@ import Features from "./components/Features.jsx";
 import Compliance from "./components/Compliance.jsx";
 import FAQ from "./components/FAQ.jsx";
 import Footer from "./components/Footer.jsx";
+import Cursor from "./components/Cursor.jsx";
+import PrintBoot from "./components/PrintBoot.jsx";
+import SoundToggle from "./components/SoundToggle.jsx";
 
 gsap.registerPlugin(ScrollTrigger);
 
-/* ✂ travels along the perforation as the divider crosses the viewport —
-   scroll literally cuts the page into slips. */
+/* ✂ travels along the perforation as the divider crosses the viewport,
+   and the paper visibly separates behind the blade: left of the scissors
+   the line is torn into two offset edges, right of it still intact. */
 function Cut() {
   const row = useRef(null);
-  const blade = useRef(null);
   useLayoutEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const ctx = gsap.context(() => {
-      gsap.fromTo(blade.current, { x: 0 }, {
-        x: () => row.current.offsetWidth - 34,
-        ease: "none",
-        scrollTrigger: { trigger: row.current, start: "top 92%", end: "top 30%", scrub: 0.6 },
+      const el = row.current;
+      const blade = el.querySelector(".scissors");
+      const uncut = el.querySelector(".cut-uncut");
+      const top = el.querySelector(".cut-top");
+      const bot = el.querySelector(".cut-bot");
+      ScrollTrigger.create({
+        trigger: el,
+        start: "top 92%",
+        end: "top 26%",
+        scrub: 0.5,
+        onUpdate(self) {
+          const w = el.offsetWidth;
+          const x = self.progress * (w - 30);
+          gsap.set(blade, { x });
+          const cutPx = Math.max(0, x + 8);
+          /* torn halves visible only left of the blade; intact line right of it */
+          const torn = `inset(-10px ${Math.max(0, w - cutPx)}px -10px 0)`;
+          uncut.style.clipPath = `inset(-10px 0 -10px ${cutPx}px)`;
+          top.style.clipPath = torn;
+          bot.style.clipPath = torn;
+        },
       });
     }, row);
     return () => ctx.revert();
   }, []);
   return (
     <div className="container">
-      <div className="cut" ref={row}><span className="scissors" ref={blade}>✂</span></div>
+      <div className="cut2" ref={row} aria-hidden="true">
+        <span className="cut-uncut" />
+        <span className="cut-top" />
+        <span className="cut-bot" />
+        <span className="scissors">✂</span>
+      </div>
     </div>
   );
 }
@@ -86,6 +111,19 @@ export default function App() {
       lenis.scrollTo(el, { offset: -70, duration: 1.15 });
     };
     document.addEventListener("click", onAnchor);
+    // ink smear: headlines lean with scroll velocity, marquee shears sideways
+    const smears = gsap.utils.toArray(".h2").map((el) =>
+      gsap.quickTo(el, "skewY", { duration: 0.5, ease: "power3.out" })
+    );
+    const mq = document.querySelector(".marquee-smear");
+    const mSet = mq ? gsap.quickTo(mq, "skewX", { duration: 0.5, ease: "power3.out" }) : null;
+    const onVel = (e) => {
+      const v = e.velocity || 0;
+      const s = gsap.utils.clamp(-2, 2, v * 0.03);
+      smears.forEach((f) => f(s));
+      mSet?.(gsap.utils.clamp(-6, 6, v * 0.09));
+    };
+    lenis.on("scroll", onVel);
     return () => {
       document.removeEventListener("click", onAnchor);
       gsap.ticker.remove(raf);
@@ -95,6 +133,9 @@ export default function App() {
 
   return (
     <>
+      <PrintBoot />
+      <Cursor />
+      <SoundToggle />
       <Nav />
       <FeedProgress />
       <div className="frame">

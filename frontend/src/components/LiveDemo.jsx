@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { RECEIPT } from "../data/receipt.js";
 import { APP } from "../config.js";
 import PrintReveal from "./PrintReveal.jsx";
+import { kachunk } from "../lib/sound.js";
 
 const API_BASE = APP.replace(/\/app$/, "");
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -15,7 +16,7 @@ const CATALOG = [
 ];
 
 const STEPS = [
-  ["Signing invoice — SHA512withRSA, INSA certificate", 700],
+  ["Signing invoice · SHA512withRSA, INSA certificate", 700],
   ["POST /v1/register → Ministry of Revenue EIMS", 1400],
   [`IRN + signed QR issued · sequence #${RECEIPT.docNo}`, 2100],
   ["POST /v1/receipt/sales → RRN issued", 2800],
@@ -55,6 +56,7 @@ export default function LiveDemo() {
     const [result] = await Promise.all([charge, delay(600 + STEPS.length * 700)]);
     if (result) {
       setLive(result);
+      kachunk(); /* registered for real — stamp it */
     } else {
       setPreview({
         docNo: "PREVIEW", date: "", items: snapItems,
@@ -82,7 +84,7 @@ export default function LiveDemo() {
         <div className="split-demo">
           {/* cashier side */}
           <div style={{ border: "1.5px dashed var(--line)", padding: 26, background: "var(--paper)", color: "var(--paper-ink)" }}>
-            <div className="mono" style={{ fontSize: 11, letterSpacing: ".2em", color: "var(--green)", marginBottom: 4 }}>POINT OF SALE — CASHIER VIEW</div>
+            <div className="mono" style={{ fontSize: 11, letterSpacing: ".2em", color: "var(--green)", marginBottom: 4 }}>POINT OF SALE · CASHIER VIEW</div>
             <div className="mono" style={{ fontSize: 10.5, color: "var(--paper-muted)", marginBottom: 14 }}>DELTA AESTHETICS · pilot merchant · sandbox</div>
             {CATALOG.map((it) => (
               <div key={it.code} className="mono" style={{ ...row, alignItems: "center", padding: "9px 0", borderBottom: "1px dashed #d8d3c2", fontSize: 13.5, opacity: qty[it.code] ? 1 : 0.45 }}>
@@ -109,7 +111,7 @@ export default function LiveDemo() {
                     style={{ width: "100%", justifyContent: "center", marginTop: 20, opacity: cart.length ? 1 : 0.5, background: phase === "done" ? "var(--green-deep)" : undefined }}>
               {phase === "idle" && "Charge & issue fiscal receipt"}
               {phase === "running" && "Registering with MoR…"}
-              {phase === "done" && "✓ Receipt issued — scan the QR"}
+              {phase === "done" && "✓ Receipt issued · scan the QR"}
             </button>
             <div className="mono" style={{ marginTop: 16, fontSize: 12, color: "var(--muted)" }}>
               {STEPS.map(([label], i) => (
@@ -150,7 +152,7 @@ export default function LiveDemo() {
                   {R.isPreview ? (
                     <>
                       <div style={{ textAlign: "center", color: "#a8750d", fontWeight: 700, fontSize: 12, letterSpacing: ".08em" }}>
-                        ⚠ PREVIEW — NOT REGISTERED
+                        ⚠ PREVIEW · NOT REGISTERED
                       </div>
                       <div style={{ textAlign: "center", color: "var(--paper-muted)", fontSize: 10, marginTop: 4 }}>
                         This secure page can't reach the pilot server, so nothing was sent to MoR.
@@ -166,11 +168,11 @@ export default function LiveDemo() {
                   ) : (
                     <>
                       <div style={{ textAlign: "center", color: "var(--green)", fontWeight: 600, fontSize: 12, letterSpacing: ".08em" }}>
-                        ✓ REGISTERED WITH MINISTRY OF REVENUE{live ? " — JUST NOW" : ""}
+                        ✓ REGISTERED WITH MINISTRY OF REVENUE{live ? " · JUST NOW" : ""}
                       </div>
                       <div style={{ textAlign: "center", color: "var(--paper-muted)", fontSize: 10, marginTop: 4 }}>
                         {live
-                          ? "This receipt was created seconds ago — refresh the MoR portal and it's there."
+                          ? "This receipt was created seconds ago. Refresh the MoR portal and it's there."
                           : "Registered 6 Jul 2026 in the MoR sandbox by this platform."}
                       </div>
                     </>
