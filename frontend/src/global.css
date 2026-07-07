@@ -191,6 +191,40 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 @keyframes rc-blink { 0%, 54% { opacity: 1; } 55%, 100% { opacity: 0; } }
 .cursor-blink { animation: rc-blink 1.05s steps(1) infinite; animation-delay: 1.7s; }
 
+/* --- how-it-works storyboard --- */
+.howflow-wrap { margin-top: 44px; }
+.howflow { width: 100%; height: auto; display: block; }
+.hf-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 34px; }
+.hf-card {
+  border: 1.5px dashed var(--line); background: var(--paper); color: var(--paper-ink);
+  padding: 26px 22px; transition: transform .35s ease, border-color .35s ease, box-shadow .35s ease;
+}
+.hf-card.is-active {
+  border-style: solid; border-color: var(--green);
+  transform: translateY(-6px); box-shadow: 0 14px 30px var(--shadow);
+}
+@media (max-width: 880px) {
+  /* the storyboard becomes a swipeable film strip; the journey autoplays */
+  .howflow-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 34px;
+    scrollbar-width: none; }
+  .howflow-wrap::-webkit-scrollbar { display: none; }
+  .howflow { min-width: 780px; }
+  .hf-cards { grid-template-columns: 1fr; gap: 12px; }
+  .hf-card { padding: 20px 18px; }
+}
+
+/* --- thermal paper-feed scroll progress (under the fixed nav) --- */
+.feedbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 60;
+  pointer-events: none;
+}
+.feedbar-fill {
+  height: 100%; width: 100%; transform: scaleX(0); transform-origin: 0 50%;
+  background: repeating-linear-gradient(90deg,
+    var(--green) 0 14px, transparent 14px 20px);
+  will-change: transform;
+}
+
 /* --- responsive nav: links/actions collapse into the ≡ MENU dropdown --- */
 .nav-burger { display: none; background: none; border: 0; cursor: pointer; }
 @media (max-width: 880px) {

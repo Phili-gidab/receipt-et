@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import Lenis from "lenis";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -18,10 +18,46 @@ import Footer from "./components/Footer.jsx";
 
 gsap.registerPlugin(ScrollTrigger);
 
+/* ✂ travels along the perforation as the divider crosses the viewport —
+   scroll literally cuts the page into slips. */
 function Cut() {
+  const row = useRef(null);
+  const blade = useRef(null);
+  useLayoutEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const ctx = gsap.context(() => {
+      gsap.fromTo(blade.current, { x: 0 }, {
+        x: () => row.current.offsetWidth - 34,
+        ease: "none",
+        scrollTrigger: { trigger: row.current, start: "top 92%", end: "top 30%", scrub: 0.6 },
+      });
+    }, row);
+    return () => ctx.revert();
+  }, []);
   return (
     <div className="container">
-      <div className="cut"><span className="scissors">✂</span></div>
+      <div className="cut" ref={row}><span className="scissors" ref={blade}>✂</span></div>
+    </div>
+  );
+}
+
+/* thermal paper-feed scroll progress — a thin strip of receipt paper
+   "prints out" under the nav as you move down the roll. */
+function FeedProgress() {
+  const bar = useRef(null);
+  useLayoutEffect(() => {
+    const st = ScrollTrigger.create({
+      start: 0,
+      end: "max",
+      onUpdate: (self) => {
+        if (bar.current) bar.current.style.transform = `scaleX(${self.progress})`;
+      },
+    });
+    return () => st.kill();
+  }, []);
+  return (
+    <div className="feedbar" aria-hidden="true">
+      <div className="feedbar-fill" ref={bar} />
     </div>
   );
 }
@@ -49,6 +85,7 @@ export default function App() {
   return (
     <>
       <Nav />
+      <FeedProgress />
       <div className="frame">
         <Hero />
         <Marquee />
