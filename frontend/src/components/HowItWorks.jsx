@@ -141,7 +141,9 @@ export default function HowItWorks() {
           setActive(stepAt(tl.time()));
           if (wrap) {
             const max = wrap.scrollWidth - wrap.clientWidth;
-            if (max > 0) wrap.scrollLeft = max * Math.min(1, tl.time() / 13);
+            /* hold on station 1 until the chit departs (t≈2.2), then follow it */
+            const p = Math.min(1, Math.max(0, (tl.time() - 2.2) / 10.5));
+            if (max > 0) wrap.scrollLeft = max * p;
           }
         });
         ScrollTrigger.create({
