@@ -164,15 +164,24 @@ def dashboard(request: Request, db: Session = Depends(get_session)):
     today_local = datetime.now(reports.ADDIS_TZ).date()
     week = reports.range_report(db, merchant, today_local - timedelta(days=6), today_local)
 
-    # Compliance health: the chain head must equal the number of registered
-    # chained documents (INV/CRE/DEB all consume the same per-merchant counter).
-    chained = db.execute(
-        select(func.count(Document.id)).where(
+    # Compliance health: the chain head must equal the InvoiceCounter of the
+    # newest registered chained document. (Comparing against a local doc COUNT
+    # is wrong for merchants whose MoR counter predates this database — Delta's
+    # did — and would show a permanent false mismatch.)
+    recent_chained = list(db.execute(
+        select(Document.payload_json).where(
             Document.merchant_id == merchant.id,
             Document.doc_type.in_(["INV", "CRE", "DEB"]),
             Document.fiscal_status.in_([FiscalStatus.REGISTERED, FiscalStatus.CANCELLED]),
-        )
-    ).scalar_one()
+        ).order_by(Document.created_at.desc()).limit(50)
+    ).scalars())
+    last_counter = 0
+    for pj in recent_chained:
+        try:
+            c = int((json.loads(pj or "{}").get("SourceSystem") or {}).get("InvoiceCounter") or 0)
+        except Exception:
+            c = 0
+        last_counter = max(last_counter, c)
     failed_total = db.execute(
         select(func.count(Document.id)).where(
             Document.merchant_id == merchant.id, Document.fiscal_status == FiscalStatus.FAILED,
@@ -195,7 +204,7 @@ def dashboard(request: Request, db: Session = Depends(get_session)):
         recent=recent, attention=attention,
         week=week, week_days=week.days, top_items=week.top_items[:3],
         chain_counter=(merchant.chain.counter if merchant.chain else 0),
-        chained_count=chained, failed_total=failed_total,
+        last_counter=last_counter, failed_total=failed_total,
         products_count=products_count, buyers_count=buyers_count,
         swept=swept, sweep_ok=sweep_ok, sweep_bad=sweep_bad,
     ))

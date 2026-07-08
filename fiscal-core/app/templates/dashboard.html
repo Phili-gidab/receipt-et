@@ -89,8 +89,9 @@
   <div style="display:flex;gap:10px 22px;flex-wrap:wrap;align-items:center">
     <span class="lead-row" style="padding:4px 0;gap:8px">
       <span>Sequence chain</span>
-      {% if chain_counter == chained_count %}<span class="pill ok">✓ intact · #{{ chain_counter }}</span>
-      {% else %}<span class="pill warn">head #{{ chain_counter }} vs {{ chained_count }} docs</span>{% endif %}
+      {% if last_counter == 0 %}<span class="pill">#{{ chain_counter }} · no chained docs yet</span>
+      {% elif chain_counter == last_counter %}<span class="pill ok">✓ intact · #{{ chain_counter }}</span>
+      {% else %}<span class="pill warn">head #{{ chain_counter }} vs last doc #{{ last_counter }}</span>{% endif %}
     </span>
     <span class="lead-row" style="padding:4px 0;gap:8px">
       <span>Failed documents</span>
