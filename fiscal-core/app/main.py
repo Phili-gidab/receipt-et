@@ -27,7 +27,7 @@ from app import registration, webapp
 from app.config import get_settings
 from app.db import get_session
 from app.models import Document, FiscalStatus, Merchant
-from app.routers import admin, invoices, merchants
+from app.routers import admin, invoices, merchants, mobile
 
 settings = get_settings()
 
@@ -57,6 +57,7 @@ app.include_router(merchants.router)
 app.include_router(invoices.router)
 app.include_router(admin.router)
 app.include_router(webapp.router)
+app.include_router(mobile.router)
 
 # Marketing site (Receipt-landing) served at "/" when bundled into the image.
 _LANDING = os.environ.get(

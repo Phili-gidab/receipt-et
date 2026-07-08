@@ -739,6 +739,7 @@ def retry_failed(
     *,
     limit: int = 50,
     merchant: Optional[Merchant] = None,
+    transaction_ref: Optional[str] = None,
     secrets_backend: Optional[SecretsBackend] = None,
 ) -> dict:
     """Re-register Failed invoice/note documents (bounded), advancing the chain.
@@ -768,6 +769,10 @@ def retry_failed(
     )
     if merchant is not None:
         stmt = stmt.where(Document.merchant_id == merchant.id)
+    if transaction_ref is not None:
+        # Targeted re-drive: a replayed checkout ref must be able to un-poison
+        # its own earlier Failed attempt without touching other documents.
+        stmt = stmt.where(Document.transaction_ref == transaction_ref)
 
     docs = list(session.execute(stmt).scalars())
     summary = {"attempted": 0, "succeeded": 0, "failed": 0, "skipped": 0, "results": []}
@@ -786,7 +791,18 @@ def retry_failed(
 
         secrets = _load_secrets(m, secrets_backend)
         with merchant_chain_lock(session, m.tin):
+            # Re-read UNDER the lock: the doc was selected before acquiring it,
+            # and a concurrent re-drive of the same ref may have registered it
+            # while we waited (stale identity-map state would then re-submit a
+            # registered sale and rewind the chain head).
+            session.refresh(doc)
+            if doc.fiscal_status != FiscalStatus.FAILED:
+                summary["skipped"] += 1
+                summary["results"].append({"id": doc.id, "skipped": "no longer Failed"})
+                session.commit()   # abandoning the locked region — release the xact lock
+                continue
             chain = _get_or_create_chain(session, m.id)
+            session.refresh(chain)
             next_counter = int(chain.counter) + 1
             try:
                 payload = json.loads(doc.payload_json)

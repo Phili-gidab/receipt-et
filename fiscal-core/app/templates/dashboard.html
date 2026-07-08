@@ -9,10 +9,17 @@
     <p class="muted" style="font-size:13px">TIN {{ m.tin }} · {{ m.system_type or 'POS' }} · {{ m.tax_code or 'VAT15' }}</p>
   </div>
   <span class="head-actions">
+    <a class="btn btn-ghost" href="/app/reports">Reports</a>
     <a class="btn btn-ghost" href="/app/zreport">Z-Report</a>
     <a class="btn btn-solid" href="/app/pos">+ New Sale</a>
   </span>
 </div>
+
+{% if swept %}
+<div class="card" style="border-color:{{ 'var(--accent)' if sweep_bad == '0' else 'var(--amber)' }};color:{{ 'var(--accent)' if sweep_bad == '0' else 'var(--amber)' }};margin-top:14px">
+  ⚖ MoR verify sweep: {{ sweep_ok }} of {{ swept }} recent documents confirmed straight from MoR's database{{ '.' if sweep_bad == '0' else ' — ' + sweep_bad + ' could not be confirmed. Open the documents below to investigate.' }}
+</div>
+{% endif %}
 
 <hr class="dash"/>
 
@@ -31,13 +38,75 @@
 </div>
 {% endif %}
 
-<div class="card" style="max-width:560px">
-  <p class="kicker">Today</p>
-  <div class="lead-row"><span>Sales registered</span><span class="fill"></span><span class="val">{{ stat_registered }}</span></div>
-  <div class="lead-row"><span>Documents issued</span><span class="fill"></span><span class="val">{{ stat_count }}</span></div>
-  <div class="lead-row" style="border-top:2px solid var(--line);margin-top:8px;padding-top:12px;font-size:16px">
-    <span>Total collected</span><span class="fill"></span><span class="val">ETB {{ '%.2f'|format(stat_total) }}</span>
+<div class="grid-2" style="gap:20px">
+  <div class="card">
+    <p class="kicker">Today</p>
+    <div class="lead-row"><span>Sales registered</span><span class="fill"></span><span class="val">{{ stat_registered }}</span></div>
+    <div class="lead-row"><span>Documents issued</span><span class="fill"></span><span class="val">{{ stat_count }}</span></div>
+    <div class="lead-row" style="border-top:2px solid var(--line);margin-top:8px;padding-top:12px;font-size:16px">
+      <span>Total collected</span><span class="fill"></span><span class="val">ETB {{ '%.2f'|format(stat_total) }}</span>
+    </div>
+    {% if top_items %}
+    <p class="kicker" style="margin-top:18px">Top items · 7 days</p>
+    {% for t in top_items %}
+    <div class="lead-row" style="font-size:13px">
+      <span style="overflow-wrap:anywhere">{{ t.name }} <span class="muted" style="font-size:11px">× {{ '%g'|format(t.qty) }}</span></span>
+      <span class="fill"></span><span class="val">{{ '%.2f'|format(t.amount) }}</span>
+    </div>
+    {% endfor %}
+    {% endif %}
   </div>
+
+  <div class="card">
+    <p class="kicker">Last 7 days</p>
+    {% set maxnet = week_days | map(attribute='net') | max %}
+    {% set maxnet = maxnet if maxnet and maxnet > 0 else 1 %}
+    <svg viewBox="0 0 320 118" style="width:100%;height:auto;display:block" role="img"
+         aria-label="Daily net sales for the last seven days: ETB {{ '%.2f'|format(week.net) }} total.">
+      {% for dd in week_days %}
+        {% set h = (dd.net / maxnet * 76) if dd.net > 0 else 0 %}
+        {% set x = 10 + loop.index0 * 44 %}
+        <rect x="{{ x }}" y="{{ '%.1f'|format(94 - h - 2) }}" width="36" height="{{ '%.1f'|format(h + 2) }}"
+              rx="2" fill="var(--accent)" opacity="{{ '1' if loop.last else '0.55' }}">
+          <title>{{ dd.day.strftime('%a %d %b') }} — ETB {{ '%.2f'|format(dd.net) }} · {{ dd.inv_count }} invoice{{ '' if dd.inv_count == 1 else 's' }}</title>
+        </rect>
+        {% if loop.last and dd.net > 0 %}
+        <text x="{{ x + 18 }}" y="{{ '%.1f'|format(94 - h - 8) }}" text-anchor="middle" font-size="10"
+              fill="var(--ink)" font-weight="700">{{ '%.0f'|format(dd.net) }}</text>
+        {% endif %}
+        <text x="{{ x + 18 }}" y="110" text-anchor="middle" font-size="8.5" letter-spacing="1"
+              fill="var(--muted)">{{ dd.day.strftime('%a')|upper }}</text>
+      {% endfor %}
+      <line x1="6" y1="94" x2="314" y2="94" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 3"/>
+    </svg>
+    <div class="lead-row" style="margin-top:6px"><span>Week net</span><span class="fill"></span><span class="val">ETB {{ '%.2f'|format(week.net) }}</span></div>
+    <div class="lead-row"><span>VAT position · 7 days</span><span class="fill"></span><span class="val">ETB {{ '%.2f'|format(week.vat_out) }}</span></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px">
+  <p class="kicker">Compliance</p>
+  <div style="display:flex;gap:10px 22px;flex-wrap:wrap;align-items:center">
+    <span class="lead-row" style="padding:4px 0;gap:8px">
+      <span>Sequence chain</span>
+      {% if chain_counter == chained_count %}<span class="pill ok">✓ intact · #{{ chain_counter }}</span>
+      {% else %}<span class="pill warn">head #{{ chain_counter }} vs {{ chained_count }} docs</span>{% endif %}
+    </span>
+    <span class="lead-row" style="padding:4px 0;gap:8px">
+      <span>Failed documents</span>
+      <span class="pill {{ 'bad' if failed_total else 'ok' }}">{{ failed_total }}</span>
+    </span>
+    <form method="post" action="/app/verify-sweep" style="margin-left:auto"
+          onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='Asking MoR…'">
+      <button class="btn btn-ghost btn-sm" type="submit">⚖ Verify recent at MoR</button>
+    </form>
+  </div>
+  <p class="muted" style="font-size:11.5px;margin-top:8px">
+    The sweep asks MoR's /v1/verify about your latest registered documents — the same
+    check an auditor would run. Catalog: <a class="accent" href="/app/products">{{ products_count }} item{{ '' if products_count == 1 else 's' }}</a>
+    · Directory: <a class="accent" href="/app/buyers">{{ buyers_count }} buyer{{ '' if buyers_count == 1 else 's' }}</a>
+    · <a class="accent" href="/app/reports">VAT &amp; sales reports →</a>
+  </p>
 </div>
 
 <hr class="dash"/>

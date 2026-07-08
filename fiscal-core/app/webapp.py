@@ -20,18 +20,17 @@ from __future__ import annotations
 
 import json
 import os
-import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app import mor_client, printing, registration
+from app import mor_client, pos, printing, registration
 from app.db import get_session
-from app.models import Document, FiscalStatus, Merchant, MerchantSecret
+from app.models import Buyer, Document, FiscalStatus, Merchant, MerchantSecret, Product
 from app.secrets_backend import get_secrets_backend
 
 router = APIRouter(prefix="/app", tags=["webapp"])
@@ -159,22 +158,72 @@ def dashboard(request: Request, db: Session = Depends(get_session)):
             Document.fiscal_status.in_([FiscalStatus.FAILED, FiscalStatus.PENDING]),
         ).order_by(Document.created_at.desc()).limit(6)
     ).scalars())
+
+    # Last-7-days series + week totals (Addis calendar; same math as reports).
+    from app import reports
+    today_local = datetime.now(reports.ADDIS_TZ).date()
+    week = reports.range_report(db, merchant, today_local - timedelta(days=6), today_local)
+
+    # Compliance health: the chain head must equal the number of registered
+    # chained documents (INV/CRE/DEB all consume the same per-merchant counter).
+    chained = db.execute(
+        select(func.count(Document.id)).where(
+            Document.merchant_id == merchant.id,
+            Document.doc_type.in_(["INV", "CRE", "DEB"]),
+            Document.fiscal_status.in_([FiscalStatus.REGISTERED, FiscalStatus.CANCELLED]),
+        )
+    ).scalar_one()
+    failed_total = db.execute(
+        select(func.count(Document.id)).where(
+            Document.merchant_id == merchant.id, Document.fiscal_status == FiscalStatus.FAILED,
+        )
+    ).scalar_one()
+    products_count = db.execute(
+        select(func.count(Product.id)).where(Product.merchant_id == merchant.id, Product.active.is_(True))
+    ).scalar_one()
+    buyers_count = db.execute(
+        select(func.count(Buyer.id)).where(Buyer.merchant_id == merchant.id)
+    ).scalar_one()
+
+    swept = request.query_params.get("swept") or ""
+    sweep_ok = request.query_params.get("sweep_ok") or ""
+    sweep_bad = request.query_params.get("sweep_bad") or ""
+
     return templates.TemplateResponse(request, "dashboard.html", _ctx(
         request, merchant,
         stat_count=len(today), stat_registered=len(registered), stat_total=total,
         recent=recent, attention=attention,
+        week=week, week_days=week.days, top_items=week.top_items[:3],
+        chain_counter=(merchant.chain.counter if merchant.chain else 0),
+        chained_count=chained, failed_total=failed_total,
+        products_count=products_count, buyers_count=buyers_count,
+        swept=swept, sweep_ok=sweep_ok, sweep_bad=sweep_bad,
     ))
 
 
 # --------------------------------------------------------------------------- #
 # POS
 # --------------------------------------------------------------------------- #
+def _pos_ctx(request: Request, merchant: Merchant, db: Session, **extra) -> dict:
+    """POS template context: catalog grid + saved-buyer picker ride along."""
+    products = list(db.execute(
+        select(Product).where(Product.merchant_id == merchant.id, Product.active.is_(True))
+        .order_by(Product.name.asc())
+    ).scalars())
+    buyers = list(db.execute(
+        select(Buyer).where(Buyer.merchant_id == merchant.id)
+        .order_by(Buyer.last_used_at.desc().nullslast(), Buyer.name.asc()).limit(40)
+    ).scalars())
+    return _ctx(request, merchant, tax_code=merchant.tax_code or "VAT15",
+                products=products, buyers=buyers, **extra)
+
+
 @router.get("/pos", response_class=HTMLResponse)
-def pos(request: Request, db: Session = Depends(get_session)):
+def pos_page(request: Request, db: Session = Depends(get_session)):  # NB: don't name this "pos" — it would shadow the app.pos module used below
     merchant = _current(request, db)
     if merchant is None:
         return RedirectResponse(url="/app/login", status_code=303)
-    return templates.TemplateResponse(request, "pos.html", _ctx(request, merchant, tax_code=merchant.tax_code or "VAT15"))
+    return templates.TemplateResponse(request, "pos.html", _pos_ctx(request, merchant, db))
 
 
 @router.post("/pos/checkout")
@@ -191,46 +240,15 @@ def checkout(
         return RedirectResponse(url="/app/login", status_code=303)
 
     lines = json.loads(cart or "[]")
-    items = [{
-        "item_code": (str(li.get("code") or li.get("name") or "ITEM"))[:15],
-        "product_description": str(li.get("name") or "Item")[:300],
-        "unit_price": float(li.get("price") or 0),
-        "quantity": float(li.get("qty") or 1),
-        "discount": float(li.get("discount") or 0),
-        "nature_of_supplies": "goods",
-        "unit": "PCS",
-        "tax_code": merchant.tax_code or "VAT15",
-    } for li in lines]
-    total = sum(i["unit_price"] * i["quantity"] - i["discount"] for i in items)
-
-    tx = {
-        "transaction_ref": f"POS-{uuid.uuid4().hex[:12]}",
-        "amount": round(total, 2),
-        "currency": "ETB",
-        "payment_mode": "CASH" if payment_method.upper() in ("CASH", "TELEBIRR", "MOBILE") else "CREDIT",
-        "items": items,
-        "buyer": ({"legal_name": buyer_name.strip(), "tin": buyer_tin.strip()}
-                  if buyer_tin.strip() else ({"legal_name": buyer_name.strip()} if buyer_name.strip() else None)),
-    }
     try:
-        doc = registration.register_invoice_for_merchant(db, merchant, tx)
-        # If the invoice registered, also issue a sales receipt (best-effort).
-        if doc.fiscal_status == FiscalStatus.REGISTERED and doc.irn:
-            try:
-                registration.register_receipt_for_document(db, merchant, {
-                    "transaction_ref": f"RCP-{doc.transaction_ref}",
-                    "collected_amount": float(doc.amount or total),
-                    "invoices": [{"invoice_irn": doc.irn, "payment_coverage": "FULL",
-                                  "invoice_paid_amount": float(doc.amount or total),
-                                  "total_amount": float(doc.amount or total)}],
-                    "transaction_details": {"mode_of_payment": tx["payment_mode"]},
-                })
-            except registration.RegistrationError:
-                pass
+        doc = pos.checkout_sale(
+            db, merchant, lines,
+            payment_method=payment_method, buyer_tin=buyer_tin, buyer_name=buyer_name,
+        )
     except Exception as exc:  # RegistrationError, missing secrets (KeyError), transport, …
         return templates.TemplateResponse(
             request, "pos.html",
-            _ctx(request, merchant, tax_code=merchant.tax_code or "VAT15", error=str(exc)),
+            _pos_ctx(request, merchant, db, error=str(exc)),
             status_code=400,
         )
     return RedirectResponse(url=f"/app/receipt/{doc.id}", status_code=303)
@@ -387,67 +405,14 @@ def receipt_refund(request: Request, doc_id: int, reason: str = Form(""),
         return RedirectResponse(url="/app/login", status_code=303)
     if doc is None:
         return RedirectResponse(url="/app/receipts", status_code=303)
-    if doc.doc_type != "INV" or doc.fiscal_status != FiscalStatus.REGISTERED or not doc.irn:
-        return _back_to_doc(doc_id, err="Refunds need a registered invoice.")
-    if not doc.amount:
-        return _back_to_doc(doc_id, err="Original amount unknown — cannot refund.")
-
-    # MoR rule 7020: a credit note's items must MIRROR the original invoice's
-    # items (product/qty/tax code/unit) — rebuild them from the stored payload.
-    # Feeding TotalLineAmount/qty back through the builder re-finds the exact
-    # same UnitPrice, so the note reproduces the original lines to the cent.
     try:
-        orig_items = (json.loads(doc.payload_json or "{}").get("ItemList")) or []
-    except Exception:
-        orig_items = []
-    if not orig_items:
-        return _back_to_doc(doc_id, err="Original items unavailable — cannot refund.")
-    items = [{
-        "item_code": it.get("ItemCode") or "",
-        "product_description": it.get("ProductDescription") or "",
-        "unit_price": float(it.get("TotalLineAmount") or 0) / float(it.get("Quantity") or 1),
-        "quantity": it.get("Quantity") or 1,
-        "discount": 0.0,
-        "nature_of_supplies": it.get("NatureOfSupplies") or "goods",
-        "unit": it.get("Unit") or "PCS",
-        "tax_code": it.get("TaxCode") or (merchant.tax_code or "VAT15"),
-    } for it in orig_items]
-
-    # idempotent on success; a FAILED attempt must not block the retry
-    base_ref = f"CRE-{doc.transaction_ref}"
-    prior = list(db.execute(
-        select(Document).where(Document.merchant_id == merchant.id,
-                               Document.transaction_ref.like(f"{base_ref}%"))
-    ).scalars())
-    done = next((p for p in prior if p.fiscal_status == FiscalStatus.REGISTERED), None)
-    if done is not None:
-        return _back_to_doc(done.id, ok="Already refunded — this is the credit note.")
-    ref = base_ref if not prior else f"{base_ref}-{uuid.uuid4().hex[:4]}"
-
-    # MoR 7030: the note's transaction type (B2B/B2C) must match the original —
-    # carry the original invoice's buyer over to the credit note.
-    try:
-        orig_buyer = (json.loads(doc.payload_json or "{}").get("BuyerDetails")) or {}
-    except Exception:
-        orig_buyer = {}
-    buyer = None
-    if orig_buyer.get("Tin"):
-        buyer = {"legal_name": orig_buyer.get("LegalName") or "Customer", "tin": orig_buyer["Tin"]}
-
-    note = {
-        "transaction_ref": ref,
-        "amount": float(doc.amount),
-        "currency": doc.currency or "ETB",
-        "payment_mode": "CASH",
-        "related_irn": doc.irn,
-        "reason": (reason.strip() or "Refund / return of goods")[:300],
-        "items": items,
-        "buyer": buyer,
-    }
-    try:
-        cre = registration.issue_credit_note(db, merchant, note)
+        cre, already = pos.refund_sale(db, merchant, doc, reason=reason)
+    except ValueError as exc:
+        return _back_to_doc(doc_id, err=str(exc))
     except Exception as exc:
         return _back_to_doc(doc_id, err=f"Refund failed: {str(exc)[:250]}")
+    if already:
+        return _back_to_doc(cre.id, ok="Already refunded — this is the credit note.")
     if cre.fiscal_status == FiscalStatus.REGISTERED:
         return _back_to_doc(cre.id, ok="Refund registered with MoR (credit note).")
     return _back_to_doc(cre.id, err=f"Credit note rejected: {(cre.error or '')[:250]}")
@@ -460,49 +425,27 @@ def receipt_refund(request: Request, doc_id: int, reason: str = Form(""),
 def zreport(request: Request, date: str = "", db: Session = Depends(get_session)):
     from datetime import timedelta
 
+    from app import reports
+
     merchant = _current(request, db)
     if merchant is None:
         return RedirectResponse(url="/app/login", status_code=303)
-    addis = timezone(timedelta(hours=3))
     try:
-        day = datetime.strptime(date, "%Y-%m-%d").date() if date else datetime.now(addis).date()
+        day = datetime.strptime(date, "%Y-%m-%d").date() if date else datetime.now(reports.ADDIS_TZ).date()
     except ValueError:
-        day = datetime.now(addis).date()
-    start_local = datetime(day.year, day.month, day.day, tzinfo=addis)
-    start_utc = start_local.astimezone(timezone.utc)
-    end_utc = start_utc + timedelta(days=1)
+        day = datetime.now(reports.ADDIS_TZ).date()
 
-    docs = list(db.execute(
-        select(Document).where(
-            Document.merchant_id == merchant.id,
-            Document.created_at >= start_utc,
-            Document.created_at < end_utc,
-        ).order_by(Document.created_at.asc())
-    ).scalars())
-
-    def _vat_of(d: Document) -> float:
-        try:
-            return float((json.loads(d.payload_json or "{}").get("ValueDetails") or {}).get("TaxValue") or 0)
-        except Exception:
-            return 0.0
-
-    inv = [d for d in docs if d.doc_type == "INV" and d.fiscal_status == FiscalStatus.REGISTERED]
-    cre = [d for d in docs if d.doc_type == "CRE" and d.fiscal_status == FiscalStatus.REGISTERED]
-    gross = sum(float(d.amount or 0) for d in inv)
-    refunds = sum(float(d.amount or 0) for d in cre)
-    vat_out = sum(_vat_of(d) for d in inv) - sum(_vat_of(d) for d in cre)
-    voided = [d for d in docs if d.fiscal_status == FiscalStatus.CANCELLED]
-    failed = [d for d in docs if d.fiscal_status == FiscalStatus.FAILED]
+    z = reports.zreport_for_day(db, merchant, day)
 
     return templates.TemplateResponse(request, "zreport.html", _ctx(
         request, merchant,
         day=day.strftime("%d %b %Y"), day_iso=day.isoformat(),
         prev_day=(day - timedelta(days=1)).isoformat(),
         next_day=(day + timedelta(days=1)).isoformat(),
-        docs=docs, inv_count=len(inv), gross=gross, refunds=refunds,
-        net=gross - refunds, vat_out=vat_out,
-        rcp_count=sum(1 for d in docs if d.doc_type == "RCP" and d.fiscal_status == FiscalStatus.REGISTERED),
-        voided_count=len(voided), failed_count=len(failed),
+        docs=z.docs, inv_count=z.inv_count, gross=z.gross, refunds=z.refunds,
+        net=z.net, vat_out=z.vat_out,
+        rcp_count=z.rcp_count,
+        voided_count=z.voided_count, failed_count=z.failed_count,
     ))
 
 
@@ -518,6 +461,257 @@ def receipts(request: Request, q: str = "", db: Session = Depends(get_session)):
                           | func.coalesce(Document.transaction_ref, "").ilike(like))
     docs = list(db.execute(stmt.order_by(Document.created_at.desc()).limit(100)).scalars())
     return templates.TemplateResponse(request, "receipts.html", _ctx(request, merchant, docs=docs, q=q))
+
+
+# --------------------------------------------------------------------------- #
+# Items catalog (MoR-correct products: ItemCode, goods/service, per-item tax)
+# --------------------------------------------------------------------------- #
+def _back_to(path: str, *, ok: str = "", err: str = "") -> RedirectResponse:
+    from urllib.parse import quote
+    qs = f"?ok={quote(ok)}" if ok else (f"?err={quote(err)}" if err else "")
+    return RedirectResponse(url=f"{path}{qs}", status_code=303)
+
+
+def _clean_code(code: str, fallback: str) -> str:
+    raw = (code or fallback or "ITEM").upper()
+    return ("".join(ch for ch in raw if ch.isalnum() or ch == "-") or "ITEM")[:15]
+
+
+@router.get("/products", response_class=HTMLResponse)
+def products_page(request: Request, ok: str = "", err: str = "", db: Session = Depends(get_session)):
+    merchant = _current(request, db)
+    if merchant is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    items = list(db.execute(
+        select(Product).where(Product.merchant_id == merchant.id)
+        .order_by(Product.active.desc(), Product.name.asc())
+    ).scalars())
+    return templates.TemplateResponse(request, "products.html", _ctx(
+        request, merchant, products=items, ok=ok or None, err=err or None,
+    ))
+
+
+@router.post("/products")
+def product_create(
+    request: Request,
+    name: str = Form(...),
+    code: str = Form(""),
+    price: str = Form(...),
+    nature: str = Form("goods"),
+    tax_code: str = Form(""),
+    stock: str = Form(""),
+    db: Session = Depends(get_session),
+):
+    merchant = _current(request, db)
+    if merchant is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    try:
+        unit_price = round(float(price), 2)
+        if unit_price <= 0:
+            raise ValueError
+    except ValueError:
+        return _back_to("/app/products", err="Price must be a positive number.")
+    code = _clean_code(code, name)
+    exists = db.execute(select(Product.id).where(
+        Product.merchant_id == merchant.id, func.upper(Product.code) == code)).scalar_one_or_none()
+    if exists is not None:
+        return _back_to("/app/products", err=f"Item code {code} already exists.")
+    db.add(Product(
+        merchant_id=merchant.id, code=code, name=name.strip()[:300],
+        nature=(nature if nature in ("goods", "service") else "goods"),
+        tax_code=(tax_code if tax_code in ("VAT15", "VAT0", "VATEX") else None),
+        unit_price=unit_price,
+        stock_qty=(float(stock) if stock.strip() else None),
+    ))
+    db.commit()
+    return _back_to("/app/products", ok=f"{name.strip()} added to the catalog.")
+
+
+@router.post("/products/{pid}/update")
+def product_update(
+    request: Request,
+    pid: int,
+    price: str = Form(""),
+    stock: str = Form(""),
+    db: Session = Depends(get_session),
+):
+    merchant = _current(request, db)
+    if merchant is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    p = db.get(Product, pid)
+    if p is None or p.merchant_id != merchant.id:
+        return _back_to("/app/products", err="Item not found.")
+    try:
+        if price.strip():
+            new_price = round(float(price), 2)
+            if new_price <= 0:
+                raise ValueError
+            p.unit_price = new_price
+        p.stock_qty = float(stock) if stock.strip() else None
+    except ValueError:
+        return _back_to("/app/products", err="Price and stock must be numbers.")
+    db.commit()
+    return _back_to("/app/products", ok=f"{p.name} updated.")
+
+
+@router.post("/products/{pid}/toggle")
+def product_toggle(request: Request, pid: int, db: Session = Depends(get_session)):
+    merchant = _current(request, db)
+    if merchant is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    p = db.get(Product, pid)
+    if p is None or p.merchant_id != merchant.id:
+        return _back_to("/app/products", err="Item not found.")
+    p.active = not p.active
+    db.commit()
+    return _back_to("/app/products", ok=f"{p.name} {'restored to' if p.active else 'hidden from'} the POS.")
+
+
+# --------------------------------------------------------------------------- #
+# Buyer directory (B2B TINs; proven = a MoR registration succeeded with it)
+# --------------------------------------------------------------------------- #
+@router.get("/buyers", response_class=HTMLResponse)
+def buyers_page(request: Request, ok: str = "", err: str = "", db: Session = Depends(get_session)):
+    merchant = _current(request, db)
+    if merchant is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    rows = list(db.execute(
+        select(Buyer).where(Buyer.merchant_id == merchant.id)
+        .order_by(Buyer.proven.desc(), Buyer.last_used_at.desc().nullslast(), Buyer.name.asc())
+    ).scalars())
+    return templates.TemplateResponse(request, "buyers.html", _ctx(
+        request, merchant, buyers=rows, ok=ok or None, err=err or None,
+    ))
+
+
+@router.post("/buyers")
+def buyer_create(
+    request: Request,
+    name: str = Form(...),
+    tin: str = Form(...),
+    db: Session = Depends(get_session),
+):
+    merchant = _current(request, db)
+    if merchant is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    tin = "".join(ch for ch in tin if ch.isdigit())
+    if len(tin) != 10:
+        return _back_to("/app/buyers", err="Buyer TIN must be exactly 10 digits.")
+    exists = db.execute(select(Buyer.id).where(
+        Buyer.merchant_id == merchant.id, Buyer.tin == tin)).scalar_one_or_none()
+    if exists is not None:
+        return _back_to("/app/buyers", err="This TIN is already in the directory.")
+    db.add(Buyer(merchant_id=merchant.id, name=name.strip()[:255] or "Customer", tin=tin))
+    db.commit()
+    return _back_to("/app/buyers", ok=f"{name.strip()} saved. The MoR-proven badge appears after the first successful sale.")
+
+
+@router.post("/buyers/{bid}/delete")
+def buyer_delete(request: Request, bid: int, db: Session = Depends(get_session)):
+    merchant = _current(request, db)
+    if merchant is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    b = db.get(Buyer, bid)
+    if b is None or b.merchant_id != merchant.id:
+        return _back_to("/app/buyers", err="Buyer not found.")
+    db.delete(b)
+    db.commit()
+    return _back_to("/app/buyers", ok="Buyer removed.")
+
+
+# --------------------------------------------------------------------------- #
+# Reports (date range + VAT position + CSV) and the MoR verify sweep
+# --------------------------------------------------------------------------- #
+def _parse_range(start: str, end: str) -> tuple[date, date]:
+    """Default range: the current Addis month to date."""
+    from app import reports
+    today_local = datetime.now(reports.ADDIS_TZ).date()
+    try:
+        start_day = datetime.strptime(start, "%Y-%m-%d").date() if start else today_local.replace(day=1)
+    except ValueError:
+        start_day = today_local.replace(day=1)
+    try:
+        end_day = datetime.strptime(end, "%Y-%m-%d").date() if end else today_local
+    except ValueError:
+        end_day = today_local
+    return start_day, end_day
+
+
+@router.get("/reports", response_class=HTMLResponse)
+def reports_page(request: Request, start: str = "", end: str = "", db: Session = Depends(get_session)):
+    merchant = _current(request, db)
+    if merchant is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    from app import reports
+    start_day, end_day = _parse_range(start, end)
+    rr = reports.range_report(db, merchant, start_day, end_day)
+    today_local = datetime.now(reports.ADDIS_TZ).date()
+    first_this = today_local.replace(day=1)
+    last_month_end = first_this - timedelta(days=1)
+    return templates.TemplateResponse(request, "reports.html", _ctx(
+        request, merchant, r=rr,
+        start=rr.start_day.isoformat(), end=rr.end_day.isoformat(),
+        this_month=(first_this.isoformat(), today_local.isoformat()),
+        last_month=(last_month_end.replace(day=1).isoformat(), last_month_end.isoformat()),
+        last7=((today_local - timedelta(days=6)).isoformat(), today_local.isoformat()),
+    ))
+
+
+@router.get("/reports.csv")
+def reports_csv(request: Request, start: str = "", end: str = "", db: Session = Depends(get_session)):
+    merchant = _current(request, db)
+    if merchant is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    import csv
+    import io
+
+    from app import reports
+    start_day, end_day = _parse_range(start, end)
+    rr = reports.range_report(db, merchant, start_day, end_day)
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["date_addis", "time", "ref", "type", "doc_number", "status",
+                "amount_etb", "vat_etb", "buyer_tin", "irn", "rrn"])
+    for d in rr.docs:
+        local = d.created_at.astimezone(reports.ADDIS_TZ) if d.created_at else None
+        try:
+            vat = float((json.loads(d.payload_json or "{}").get("ValueDetails") or {}).get("TaxValue") or 0)
+        except Exception:
+            vat = 0.0
+        w.writerow([
+            local.strftime("%Y-%m-%d") if local else "", local.strftime("%H:%M:%S") if local else "",
+            d.transaction_ref, d.doc_type, d.document_number or "", d.fiscal_status.value,
+            f"{float(d.amount or 0):.2f}", f"{vat:.2f}", d.buyer_tin or "", d.irn or "", d.rrn or "",
+        ])
+    fname = f"receipt-report-{rr.start_day.isoformat()}-to-{rr.end_day.isoformat()}.csv"
+    return PlainTextResponse(out.getvalue(), media_type="text/csv",
+                             headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
+@router.post("/verify-sweep")
+def verify_sweep(request: Request, db: Session = Depends(get_session)):
+    """Bulk trust check: ask MoR /v1/verify about the latest registered docs."""
+    merchant = _current(request, db)
+    if merchant is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    docs = list(db.execute(
+        select(Document).where(
+            Document.merchant_id == merchant.id,
+            Document.doc_type.in_(["INV", "CRE", "DEB"]),
+            Document.fiscal_status == FiscalStatus.REGISTERED,
+            Document.irn.isnot(None),
+        ).order_by(Document.created_at.desc()).limit(8)
+    ).scalars())
+    ok = bad = 0
+    for d in docs:
+        try:
+            res = registration.verify_invoice_for_document(db, merchant, d.irn)
+            ok += 1 if res.get("ok") else 0
+            bad += 0 if res.get("ok") else 1
+        except Exception:
+            bad += 1
+    return RedirectResponse(
+        url=f"/app?swept={len(docs)}&sweep_ok={ok}&sweep_bad={bad}", status_code=303)
 
 
 # --------------------------------------------------------------------------- #

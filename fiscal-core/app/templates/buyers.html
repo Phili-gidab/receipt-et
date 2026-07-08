@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Buyers{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="kicker">B2B directory</p>
+    <h1 style="font-size:26px">Buyers</h1>
+    <p class="muted" style="font-size:13px">Saved TINs for B2B invoices · ✓ = proven against MoR's registry by a successful sale</p>
+  </div>
+  <span class="head-actions">
+    <a class="btn btn-solid" href="/app/pos">+ New Sale</a>
+  </span>
+</div>
+
+{% if ok %}<div class="card" style="border-color:var(--accent);color:var(--accent);margin:14px 0">✓ {{ ok }}</div>{% endif %}
+{% if err %}<div class="err" style="margin:14px 0">{{ err }}</div>{% endif %}
+
+<hr class="dash"/>
+
+<div class="card" style="max-width:640px;margin-bottom:22px">
+  <p class="kicker">Add buyer</p>
+  <form method="post" action="/app/buyers">
+    <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px">
+      <div class="field"><label>Business name</label><input name="name" required placeholder="e.g. TSION CAFE PLC"/></div>
+      <div class="field"><label>TIN</label><input name="tin" required minlength="10" maxlength="10" pattern="[0-9]{10}" inputmode="numeric" placeholder="10 digits"/></div>
+    </div>
+    <button class="btn btn-ghost btn-block" type="submit">+ Save buyer</button>
+  </form>
+  <p class="muted" style="font-size:11px;margin-top:10px">
+    MoR rejects B2B invoices whose buyer TIN is not in its registry (“buyer not found”).
+    Buyers are also saved here automatically after every successful B2B sale.
+  </p>
+</div>
+
+{% if buyers %}
+<div class="table-wrap">
+<table class="rtable">
+  <thead><tr><th>Buyer</th><th>TIN</th><th>Status</th><th>Last used</th><th></th></tr></thead>
+  <tbody>
+  {% for b in buyers %}
+    <tr>
+      <td data-label="Buyer" style="overflow-wrap:anywhere">{{ b.name }}</td>
+      <td data-label="TIN">{{ b.tin }}</td>
+      <td data-label="Status">
+        {% if b.proven %}<span class="pill ok">✓ MoR-proven</span>
+        {% else %}<span class="pill warn">unproven</span>{% endif %}
+      </td>
+      <td data-label="Last used" class="muted" style="font-size:12px">{{ b.last_used_at.strftime('%d/%m/%Y') if b.last_used_at else '—' }}</td>
+      <td class="rt-open">
+        <form method="post" action="/app/buyers/{{ b.id }}/delete" onsubmit="return confirm('Remove {{ b.name }} from the directory?')">
+          <button class="btn btn-ghost btn-sm" type="submit" style="border-color:var(--red);color:var(--red)">Remove</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="muted">No saved buyers yet. Ring a successful B2B sale and the buyer lands here automatically, or add one above.</p>
+{% endif %}
+{% endblock %}

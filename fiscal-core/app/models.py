@@ -147,6 +147,29 @@ class InvoiceChain(Base):
     merchant: Mapped[Merchant] = relationship(back_populates="chain")
 
 
+class TelegramAccount(Base):
+    """A Telegram user linked to a merchant (bot login).
+
+    One row per Telegram user; created by the bot's phone+OTP link flow and
+    deleted by /unlink. ``create_all`` adds the table on startup — no ALTER of
+    existing tables, so it is safe on the deployed EC2 database.
+    """
+
+    __tablename__ = "telegram_accounts"
+
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    merchant_id: Mapped[int] = mapped_column(
+        ForeignKey("merchants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    merchant: Mapped[Merchant] = relationship()
+
+
 class Document(Base):
     """A single fiscal document. Idempotent on (merchant_id, transaction_ref)."""
 
@@ -191,3 +214,71 @@ class Document(Base):
     registered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     merchant: Mapped[Merchant] = relationship(back_populates="documents")
+
+
+class Product(Base):
+    """A catalog item, stored MoR-correct (spec §2 ItemList field rules).
+
+    ``code`` is the MoR ItemCode (≤15 chars), ``nature`` the lowercase
+    NatureOfSupplies enum ("goods"/"service", error 7025), ``tax_code`` an
+    optional per-item override of the merchant default (VAT15/VAT0/VATEX).
+    ``stock_qty`` NULL means stock is not tracked for this item; tracked stock
+    is decremented in the shared checkout path and may go negative (oversell
+    shows up instead of being silently clamped). ``create_all`` adds the table
+    on next seed/bot run — no ALTER of existing tables.
+    """
+
+    __tablename__ = "products"
+    __table_args__ = (
+        UniqueConstraint("merchant_id", "code", name="uq_products_merchant_code"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    merchant_id: Mapped[int] = mapped_column(
+        ForeignKey("merchants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    code: Mapped[str] = mapped_column(String(15), nullable=False)      # MoR ItemCode
+    name: Mapped[str] = mapped_column(String(300), nullable=False)     # ProductDescription
+    nature: Mapped[str] = mapped_column(String(8), nullable=False, default="goods")  # goods/service
+    tax_code: Mapped[str | None] = mapped_column(String(32))           # None → merchant default
+    unit_price: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    stock_qty: Mapped[float | None] = mapped_column(Numeric(18, 3))    # None = untracked
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    merchant: Mapped[Merchant] = relationship()
+
+
+class Buyer(Base):
+    """A saved B2B buyer (name + TIN) for the merchant's directory.
+
+    ``proven`` flips to True the first time a registration with this TIN
+    succeeds at MoR — the directory doubles as a list of TINs known to exist
+    in MoR's registry (spec §8.3: unknown buyer TIN → "buyer not found 503").
+    Rows are auto-upserted by the shared checkout path on successful B2B sales.
+    """
+
+    __tablename__ = "buyers"
+    __table_args__ = (
+        UniqueConstraint("merchant_id", "tin", name="uq_buyers_merchant_tin"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    merchant_id: Mapped[int] = mapped_column(
+        ForeignKey("merchants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    tin: Mapped[str] = mapped_column(String(32), nullable=False)
+    proven: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    merchant: Mapped[Merchant] = relationship()

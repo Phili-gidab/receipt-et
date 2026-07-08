@@ -91,11 +91,10 @@
     .tabbar{display:none}
     @media(max-width:860px){.grid-2{grid-template-columns:1fr}}
     @media(max-width:760px){.pos-grid,.receipt-grid{grid-template-columns:1fr}}
-    @media(max-width:719px){
-      .container{padding:0 16px}
-      main{padding:24px 0 70px}
+    /* topbar keeps brand + theme + logout; page links move to the bottom tab
+       bar — up to tablet width, where six links no longer fit the topbar */
+    @media(max-width:880px){
       main.with-tabbar{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
-      /* topbar keeps brand + theme + logout; page links move to the bottom tab bar */
       .nav{gap:2px}
       .nav .nav-page{display:none}
       .nav a,.theme-btn{padding:10px 8px}
@@ -108,6 +107,10 @@
         border-top:2px solid transparent;margin-top:-2px}
       .tabbar .tab.active{color:var(--accent);border-top-color:var(--accent)}
       .tabbar .tab-sell{color:var(--accent)}
+    }
+    @media(max-width:719px){
+      .container{padding:0 16px}
+      main{padding:24px 0 70px}
       /* header actions become an even button row */
       .page-head{display:block}
       .head-actions{margin:14px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -127,6 +130,7 @@
       table.rtable td.rt-open{justify-content:flex-end;padding-top:8px}
       table.rtable td:empty{display:none}
     }
+    @media(max-width:400px){.tabbar .tab{font-size:9.5px;letter-spacing:1px}}
     @media print{.topbar,.tabbar,.pos-chargebar{display:none!important}main{padding:0}}
   </style>
 </head>
@@ -140,7 +144,9 @@
         {% if m %}
         <a href="/app" class="nav-page {% block nav_home %}{% endblock %}">Dashboard</a>
         <a href="/app/pos" class="nav-page {% block nav_pos %}{% endblock %}">Sell</a>
+        <a href="/app/products" class="nav-page {% block nav_products %}{% endblock %}">Items</a>
         <a href="/app/receipts" class="nav-page {% block nav_receipts %}{% endblock %}">Receipts</a>
+        <a href="/app/reports" class="nav-page {% block nav_reports %}{% endblock %}">Reports</a>
         <a href="/app/settings" class="nav-page {% block nav_settings %}{% endblock %}">Settings</a>
         {% endif %}
         <button id="themeBtn" type="button" class="theme-btn" onclick="__toggleTheme()">◐ DARK</button>
@@ -165,6 +171,7 @@
   <nav class="tabbar">
     <a href="/app" class="tab {{ self.nav_home() }}">Home</a>
     <a href="/app/pos" class="tab tab-sell {{ self.nav_pos() }}">+ Sell</a>
+    <a href="/app/products" class="tab {{ self.nav_products() }}">Items</a>
     <a href="/app/receipts" class="tab {{ self.nav_receipts() }}">Receipts</a>
     <a href="/app/settings" class="tab {{ self.nav_settings() }}">Settings</a>
   </nav>

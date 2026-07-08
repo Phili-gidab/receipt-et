@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Reports {{ start }} → {{ end }}{% endblock %}
+{% block nav_reports %}active{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="kicker">Reports</p>
+    <h1 style="font-size:clamp(20px,5vw,26px)">Sales &amp; VAT — {{ start }} → {{ end }}</h1>
+    <p class="muted" style="font-size:13px">{{ m.legal_name }} · TIN {{ m.tin }} · Africa/Addis_Ababa days</p>
+  </div>
+  <span class="head-actions">
+    <a class="btn btn-solid btn-sm" href="/app/reports.csv?start={{ start }}&end={{ end }}">⤓ CSV export</a>
+  </span>
+</div>
+
+<form method="get" action="/app/reports" class="range-bar">
+  <span class="rb-quick">
+    <a class="pill{{ ' ok' if (start, end) == this_month }}" href="/app/reports?start={{ this_month[0] }}&end={{ this_month[1] }}">This month</a>
+    <a class="pill{{ ' ok' if (start, end) == last_month }}" href="/app/reports?start={{ last_month[0] }}&end={{ last_month[1] }}">Last month</a>
+    <a class="pill{{ ' ok' if (start, end) == last7 }}" href="/app/reports?start={{ last7[0] }}&end={{ last7[1] }}">Last 7 days</a>
+  </span>
+  <span class="rb-dates">
+    <input type="date" name="start" value="{{ start }}" aria-label="from"/>
+    <span class="muted">→</span>
+    <input type="date" name="end" value="{{ end }}" aria-label="to"/>
+    <button class="btn btn-ghost btn-sm" type="submit">Apply</button>
+  </span>
+</form>
+
+<hr class="dash"/>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px">
+  <div class="card">
+    <p class="kicker">Money</p>
+    <div class="lead-row"><span>Gross sales ({{ r.inv_count }} invoices)</span><span class="fill"></span><span class="val">ETB {{ '%.2f'|format(r.gross) }}</span></div>
+    <div class="lead-row"><span>Refunds (credit notes)</span><span class="fill"></span><span class="val" style="color:var(--red)">− {{ '%.2f'|format(r.refunds) }}</span></div>
+    <div class="lead-row" style="border-top:2px solid var(--line);margin-top:8px;padding-top:12px;font-size:16px">
+      <span>Net sales</span><span class="fill"></span><span class="val">ETB {{ '%.2f'|format(r.net) }}</span>
+    </div>
+    <div class="lead-row" style="font-size:15px"><span>Output VAT to declare</span><span class="fill"></span><span class="val">ETB {{ '%.2f'|format(r.vat_out) }}</span></div>
+    <p class="muted" style="font-size:11px;margin-top:8px">
+      Output VAT = TaxValue of registered invoices minus credit notes for the range —
+      the starting number for your monthly VAT declaration.
+    </p>
+  </div>
+  <div class="card">
+    <p class="kicker">Documents</p>
+    <div class="lead-row"><span>Invoices registered</span><span class="fill"></span><span class="val">{{ r.inv_count }}</span></div>
+    <div class="lead-row"><span>Payment receipts</span><span class="fill"></span><span class="val">{{ r.rcp_count }}</span></div>
+    <div class="lead-row"><span>Voided</span><span class="fill"></span><span class="val">{{ r.voided_count }}</span></div>
+    <div class="lead-row"><span>Failed</span><span class="fill"></span><span class="val" style="{{ 'color:var(--red)' if r.failed_count }}">{{ r.failed_count }}</span></div>
+    {% if r.top_items %}
+    <p class="kicker" style="margin-top:16px">Top items</p>
+    {% for t in r.top_items[:5] %}
+    <div class="lead-row" style="font-size:13px">
+      <span style="overflow-wrap:anywhere">{{ t.name }} <span class="muted" style="font-size:11px">× {{ '%g'|format(t.qty) }}</span></span>
+      <span class="fill"></span><span class="val">{{ '%.2f'|format(t.amount) }}</span>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+</div>
+
+<hr class="dash"/>
+
+<h3 style="font-size:15px;margin-bottom:12px">Per day</h3>
+<div class="table-wrap">
+<table class="rtable">
+  <thead><tr><th>Day</th><th>Invoices</th><th>Refunds</th><th>Net</th><th>VAT</th><th></th></tr></thead>
+  <tbody>
+  {% for dd in r.days %}
+    <tr style="{{ 'opacity:.5' if dd.inv_count == 0 and dd.refunds == 0 }}">
+      <td data-label="Day">{{ dd.day.strftime('%a %d %b') }}</td>
+      <td data-label="Invoices">{{ dd.inv_count }}</td>
+      <td data-label="Refunds" style="{{ 'color:var(--red)' if dd.refunds }}">{{ '%.2f'|format(dd.refunds) }}</td>
+      <td data-label="Net">ETB {{ '%.2f'|format(dd.net) }}</td>
+      <td data-label="VAT">{{ '%.2f'|format(dd.vat_out) }}</td>
+      <td class="rt-open"><a class="accent" href="/app/zreport?date={{ dd.day.isoformat() }}">z-report →</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<style>
+  .range-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px}
+  .range-bar .rb-quick{display:flex;gap:8px;flex-wrap:wrap}
+  .range-bar .rb-quick .pill{text-decoration:none}
+  .range-bar .rb-dates{display:flex;align-items:center;gap:8px;margin-left:auto}
+  .range-bar input[type="date"]{background:var(--bg-2);border:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:8px 10px}
+  .range-bar input[type="date"]:focus{outline:none;border-color:var(--accent)}
+  @media(max-width:719px){
+    .range-bar .rb-dates{margin:10px 0 0;width:100%}
+    .range-bar input[type="date"]{flex:1;min-width:0;font-size:16px}
+  }
+</style>
+{% endblock %}

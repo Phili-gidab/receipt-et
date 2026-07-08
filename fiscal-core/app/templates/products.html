@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Items{% endblock %}
+{% block nav_products %}active{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="kicker">Catalog</p>
+    <h1 style="font-size:26px">Items</h1>
+    <p class="muted" style="font-size:13px">Tap-to-add on the POS · stored MoR-correct (item code, goods/service, tax code)</p>
+  </div>
+  <span class="head-actions">
+    <a class="btn btn-solid" href="/app/pos">+ New Sale</a>
+  </span>
+</div>
+
+{% if ok %}<div class="card" style="border-color:var(--accent);color:var(--accent);margin:14px 0">✓ {{ ok }}</div>{% endif %}
+{% if err %}<div class="err" style="margin:14px 0">{{ err }}</div>{% endif %}
+
+<hr class="dash"/>
+
+<div class="card" style="margin-bottom:22px">
+  <p class="kicker">Add item</p>
+  <form method="post" action="/app/products">
+    <div class="add-grid">
+      <div class="field"><label>Name</label><input name="name" required maxlength="300" placeholder="e.g. Signature facial session"/></div>
+      <div class="field"><label>Item code <span class="muted">(≤15, auto from name)</span></label><input name="code" maxlength="15" placeholder="FACIAL"/></div>
+      <div class="field"><label>Price (ETB, VAT incl.)</label><input name="price" required inputmode="decimal" placeholder="0.00"/></div>
+      <div class="field"><label>Type</label>
+        <select name="nature">
+          <option value="goods">Goods</option>
+          <option value="service">Service</option>
+        </select></div>
+      <div class="field"><label>Tax code</label>
+        <select name="tax_code">
+          <option value="">Default ({{ m.tax_code or 'VAT15' }})</option>
+          <option value="VAT15">VAT15</option>
+          <option value="VAT0">VAT0</option>
+          <option value="VATEX">VATEX</option>
+        </select></div>
+      <div class="field"><label>Stock <span class="muted">(blank = don't track)</span></label><input name="stock" inputmode="numeric" placeholder="∞"/></div>
+    </div>
+    <button class="btn btn-ghost btn-block" type="submit">+ Add to catalog</button>
+  </form>
+  <p class="muted" style="font-size:11px;margin-top:10px">
+    “Goods” vs “Service” is sent to MoR on every invoice line (NatureOfSupplies) — getting it
+    right here keeps every sale schema-correct automatically.
+  </p>
+</div>
+
+{% if products %}
+{% for p in products %}
+<div class="prow{{ ' prow-off' if not p.active }}">
+  <div class="prow-main">
+    <b style="overflow-wrap:anywhere">{{ p.name }}</b>
+    <span class="muted" style="font-size:11.5px;display:block">
+      {{ p.code }} · {{ p.nature }} · {{ p.tax_code or (m.tax_code or 'VAT15') }}
+      {% if not p.active %} · <span style="color:var(--amber)">hidden from POS</span>{% endif %}
+      {% if p.stock_qty is not none and p.stock_qty <= 0 %} · <span style="color:var(--red)">out of stock</span>{% endif %}
+    </span>
+  </div>
+  <form method="post" action="/app/products/{{ p.id }}/update" class="prow-form">
+    <span class="prow-field"><label>ETB</label>
+      <input name="price" value="{{ '%.2f'|format(p.unit_price) }}" inputmode="decimal" aria-label="price for {{ p.name }}"/></span>
+    <span class="prow-field"><label>Stock</label>
+      <input name="stock" value="{{ '%g'|format(p.stock_qty) if p.stock_qty is not none else '' }}" placeholder="∞" inputmode="numeric" aria-label="stock for {{ p.name }}"/></span>
+    <button class="btn btn-ghost btn-sm" type="submit">Save</button>
+  </form>
+  <form method="post" action="/app/products/{{ p.id }}/toggle">
+    <button class="btn btn-ghost btn-sm" type="submit" style="{{ 'border-color:var(--amber);color:var(--amber)' if p.active }}">
+      {{ 'Hide' if p.active else 'Show' }}</button>
+  </form>
+</div>
+{% endfor %}
+{% else %}
+<p class="muted">No items yet — add your first product above, and it becomes a tap-to-add button on the <a class="accent" href="/app/pos">POS →</a></p>
+{% endif %}
+
+<style>
+  .add-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:0 14px}
+  .prow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px dashed var(--line);padding:12px 14px;margin-bottom:10px}
+  .prow-off{opacity:.55}
+  .prow-main{flex:1;min-width:180px}
+  .prow-form{display:flex;align-items:end;gap:8px}
+  .prow-field label{display:block;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+  .prow-field input{width:86px;background:var(--bg-2);border:1px solid var(--line);color:var(--ink);font:inherit;padding:8px 9px}
+  .prow-field input:focus{outline:none;border-color:var(--accent)}
+  @media(max-width:719px){
+    .add-grid{grid-template-columns:1fr 1fr}
+    .prow{display:block}
+    .prow-form{margin-top:10px}
+    .prow form:last-child{margin-top:8px}
+    .prow-field input{font-size:16px}
+  }
+</style>
+{% endblock %}

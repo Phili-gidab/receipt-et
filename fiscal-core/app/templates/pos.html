@@ -9,7 +9,23 @@
 <div class="pos-grid">
   <!-- item entry -->
   <div class="card">
-    <p class="kicker">Add item</p>
+    {% if products %}
+    <p class="kicker">Tap to add</p>
+    <div class="prod-grid">
+      {% for p in products %}
+      <button type="button" class="prod-chip" onclick="addProduct(this)"
+              data-code="{{ p.code }}" data-name="{{ p.name }}" data-price="{{ '%.2f'|format(p.unit_price) }}"
+              data-nature="{{ p.nature }}" data-tax="{{ p.tax_code or '' }}">
+        <span class="pc-name">{{ p.name }}</span>
+        <span class="pc-meta">{{ '%.2f'|format(p.unit_price) }}{% if p.stock_qty is not none %}
+          <span class="pc-stock {{ 'pc-out' if p.stock_qty <= 0 else ('pc-low' if p.stock_qty <= 5 else '') }}">· {{ '%g'|format(p.stock_qty) }} left</span>{% endif %}</span>
+      </button>
+      {% endfor %}
+    </div>
+    <p class="muted" style="font-size:11px;margin:8px 0 0"><a class="accent" href="/app/products">manage items →</a></p>
+    <hr class="dash" style="margin:16px 0"/>
+    {% endif %}
+    <p class="kicker">Add item{{ ' manually' if products }}</p>
     <div class="field"><label>Item name</label><input id="iName" placeholder="e.g. Macchiato"/></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div class="field"><label>Unit price (ETB)</label><input id="iPrice" inputmode="decimal" placeholder="0.00"/></div>
@@ -20,6 +36,16 @@
     <hr class="dash"/>
     <p class="kicker">Buyer (optional — TIN makes it B2B)</p>
     <p class="muted" style="font-size:11px;margin:-4px 0 10px">B2B needs a TIN registered with MoR — leave blank for walk-in customers (B2C).</p>
+    {% if buyers %}
+    <div class="field"><label>Saved buyer <a class="accent" style="float:right;font-size:10px;letter-spacing:1px" href="/app/buyers">directory →</a></label>
+      <select id="buyerSel" onchange="pickBuyer(this)">
+        <option value="">— walk-in / type manually —</option>
+        {% for b in buyers %}
+        <option value="{{ b.tin }}" data-name="{{ b.name }}">{{ b.name }} · {{ b.tin }}{{ ' ✓' if b.proven }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div class="field"><label>Buyer name</label><input id="bName" placeholder="Walk-in customer"/></div>
       <div class="field"><label>Buyer TIN</label><input id="bTin" inputmode="numeric" placeholder="10-digit TIN"/></div>
@@ -77,9 +103,38 @@
   }
 </style>
 
+<style>
+  .prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px}
+  .prod-chip{font:inherit;text-align:left;background:var(--bg-2);border:1px dashed var(--line);
+    color:var(--ink);padding:9px 11px;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+  .prod-chip:hover{border-color:var(--accent)}
+  .prod-chip:active{transform:translateY(1px)}
+  .pc-name{font-size:12.5px;font-weight:600;line-height:1.35}
+  .pc-meta{font-size:11px;color:var(--accent);font-weight:700}
+  .pc-stock{color:var(--muted);font-weight:400}
+  .pc-low{color:var(--amber)}
+  .pc-out{color:var(--red)}
+</style>
 <script>
 var cart = [];
 function fmt(n){ return n.toFixed(2); }
+function addProduct(btn){
+  var d = btn.dataset;
+  var found = cart.filter(function(li){ return li.code === d.code; })[0];
+  if (found) { found.qty += 1; }
+  else {
+    var li = {name:d.name, code:d.code, price:parseFloat(d.price), qty:1, discount:0};
+    if (d.nature) li.nature = d.nature;
+    if (d.tax) li.tax_code = d.tax;
+    cart.push(li);
+  }
+  render();
+}
+function pickBuyer(sel){
+  var opt = sel.options[sel.selectedIndex];
+  document.getElementById('bTin').value = sel.value || '';
+  document.getElementById('bName').value = sel.value ? (opt.dataset.name || '') : '';
+}
 function addItem(){
   var name = document.getElementById('iName').value.trim();
   var price = parseFloat(document.getElementById('iPrice').value);
